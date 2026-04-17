@@ -1,0 +1,46 @@
+weight_training:
+  name: "Cyclist Strength Routine"
+  duration_minutes: 60
+  description: |
+    Warm-Up (5 min)
+    Deadbugs (2x10), hip circles, band pull-aparts — get the core switched on and shoulders mobile.
+
+    Block 1: Lower Body Power (20 min)
+    1. Straight Leg Deadlift (Band) — 4x10-12
+       Your primary hip hinge. Stand on band, hinge deep, squeeze glutes at top.
+    2. Bulgarian Split Squat (15lb DBs) — 3x10 each leg
+       Single-leg strength and hip stability. Take your time, control the descent.
+    3. Hip Thrust (Bodyweight or band across hips) — 3x12-15
+       Glute activation and top-end hip extension — directly translates to power phase of pedal stroke.
+    4. Single-Leg Calf Raise — 2x15 each leg
+       Often neglected but important for ankle stability and pedaling efficiency.
+
+    Block 2: Upper Body Balance (15 min)
+    5. Bent Over Row (Band) — 4x12
+       Upper back strength, counters cycling posture.
+    6. Push Up (Band or regular) — 3x12-15
+       Chest and triceps. Add band for progressive resistance.
+    7. Face Pull (Band) — 3x15
+       Rear delts and external rotators — keeps shoulders healthy and pulls you out of that hunched position.
+
+    Block 3: Core Stability (10 min)
+    8. Ab Wheel — 3x8-10
+       Anti-extension. If too difficult, do them from knees with limited range.
+    9. Side Plank — 3x30-40 sec each side
+       Anti-lateral flexion. Keeps your hips from dropping while pedaling.
+    10. Pallof Press (Band) — 2x10 each side
+        Anti-rotation. Anchor the band at chest height, press out and hold against the pull.
+
+    Cooldown (5-10 min)
+    Hip flexor stretch, pigeon pose, chest doorway stretch — address the areas that get tight from riding.
+
+low_cadence:
+  name: "Low Cadence Strength Intervals"
+  duration_minutes: 60
+  description: "Seated low-cadence work targeting neuromuscular power — user to fill in structured steps"
+
+scheduling:
+  tsb_fresh: 5
+  tsb_fatigued: -10
+  weight_sessions: 2
+  min_weight_gap_days: 2
