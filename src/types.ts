@@ -7,8 +7,8 @@ export interface WorkoutDefinition {
 }
 
 export interface SchedulingConfig {
-  tsb_fresh: number;       // default 5
-  tsb_fatigued: number;    // default -10
+  tsb_fresh: number; // default 5
+  tsb_fatigued: number; // default -10
   weight_sessions: number; // default 2
   min_weight_gap_days: number; // default 2
 }
@@ -27,13 +27,13 @@ export interface IntervalsEvent {
   name: string;
   category: string; // "WORKOUT", "NOTE", etc.
   description?: string;
-  type?: string;     // "Ride", "WeightTraining", etc.
+  type?: string; // "Ride", "WeightTraining", etc.
 }
 
 export interface TrainingLoad {
-  ctl: number;  // chronic training load (fitness)
-  atl: number;  // acute training load (fatigue)
-  tsb: number;  // training stress balance (form)
+  ctl: number; // chronic training load (fitness)
+  atl: number; // acute training load (fatigue)
+  tsb: number; // training stress balance (form)
 }
 
 // --- Xert ---
@@ -42,9 +42,9 @@ export interface XertTrainingInfo {
   ftp: number;
   ltp: number;
   hie: number;
-  pp: number;          // peak power
+  pp: number; // peak power
   training_status: string;
-  focus: string;       // recommended focus type
+  focus: string; // recommended focus type
   wotd_name?: string;
   wotd_description?: string;
 }
@@ -64,7 +64,7 @@ export interface PlannedWorkout {
 }
 
 export interface SchedulerInput {
-  startDate: string;               // YYYY-MM-DD, first day of planning window
+  startDate: string; // YYYY-MM-DD, first day of planning window
   existingEvents: IntervalsEvent[];
   trainingLoad: TrainingLoad;
   xertInfo: XertTrainingInfo;

@@ -3,9 +3,7 @@ import type {
   PlannedWorkout,
   WorkoutType,
   CyclingIntensity,
-  IntervalsEvent,
   Config,
-  TrainingLoad,
   XertTrainingInfo,
 } from "./types.js";
 
@@ -15,10 +13,7 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function classifyIntensity(
-  tsb: number,
-  config: Config,
-): CyclingIntensity {
+function classifyIntensity(tsb: number, config: Config): CyclingIntensity {
   if (tsb > config.scheduling.tsb_fresh) return "hard";
   if (tsb < config.scheduling.tsb_fatigued) return "easy";
   return "moderate";
@@ -29,10 +24,7 @@ function isHard(type: WorkoutType, intensity: CyclingIntensity | "hard"): boolea
   return intensity === "hard";
 }
 
-function buildCyclingDescription(
-  intensity: CyclingIntensity,
-  xert: XertTrainingInfo,
-): string {
+function buildCyclingDescription(intensity: CyclingIntensity, xert: XertTrainingInfo): string {
   switch (intensity) {
     case "easy":
       return "Easy ride — Zone 2 recovery spin";
@@ -51,9 +43,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const { scheduling, weight_training, low_cadence } = config;
 
   // Build set of dates that already have events
-  const lockedDates = new Set(
-    existingEvents.map((e) => e.start_date_local),
-  );
+  const lockedDates = new Set(existingEvents.map((e) => e.start_date_local));
 
   // Generate the 7 dates
   const dates: string[] = [];
@@ -62,9 +52,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   }
 
   // Available day indices (not locked)
-  const available = dates
-    .map((d, i) => (lockedDates.has(d) ? -1 : i))
-    .filter((i) => i >= 0);
+  const available = dates.map((d, i) => (lockedDates.has(d) ? -1 : i)).filter((i) => i >= 0);
 
   const intensity = classifyIntensity(trainingLoad.tsb, config);
 
@@ -84,9 +72,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   }
 
   // 1. Place low cadence — pick a day with moderate freshness, avoiding edges if possible
-  const lcCandidates = available.filter(
-    (i) => !wouldCreateBackToBack(i, true),
-  );
+  const lcCandidates = available.filter((i) => !wouldCreateBackToBack(i, true));
   const lcIdx = lcCandidates.find((i) => i >= 2 && i <= 4) ?? lcCandidates[0];
   if (lcIdx !== undefined) {
     plan[lcIdx] = {
@@ -100,9 +86,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
 
   // 2. Place weight training — 2 sessions, spaced min_weight_gap_days apart
   const weightSlots: number[] = [];
-  const remainingAvailable = available.filter(
-    (i) => plan[i] === null,
-  );
+  const remainingAvailable = available.filter((i) => plan[i] === null);
 
   for (const i of remainingAvailable) {
     if (wouldCreateBackToBack(i, true)) continue;
@@ -128,9 +112,10 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
 
   // 3. Assign rest day — pick the day after the hardest cluster
   const restCandidates = available.filter((i) => plan[i] === null);
-  const restIdx = restCandidates.find(
-    (i) => i > 0 && plan[i - 1] !== null && isHard(plan[i - 1]!.type, plan[i - 1]!.intensity),
-  ) ?? restCandidates[restCandidates.length - 1];
+  const restIdx =
+    restCandidates.find(
+      (i) => i > 0 && plan[i - 1] !== null && isHard(plan[i - 1]!.type, plan[i - 1]!.intensity),
+    ) ?? restCandidates[restCandidates.length - 1];
 
   if (restIdx !== undefined) {
     plan[restIdx] = {
@@ -159,7 +144,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
           ? "Easy Ride"
           : rideIntensity === "moderate"
             ? "Moderate Ride"
-            : xertInfo.wotd_name ?? "Hard Ride",
+            : (xertInfo.wotd_name ?? "Hard Ride"),
       description: buildCyclingDescription(rideIntensity, xertInfo),
       intensity: rideIntensity,
     };

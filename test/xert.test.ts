@@ -21,10 +21,10 @@ const MOCK_TRAINING_INFO = {
 
 describe("XertClient", () => {
   let client: XertClient;
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: ReturnType<typeof vi.fn> & typeof globalThis.fetch;
 
   beforeEach(() => {
-    mockFetch = vi.fn();
+    mockFetch = vi.fn() as typeof mockFetch;
     client = new XertClient("user@example.com", "password123", mockFetch);
   });
 

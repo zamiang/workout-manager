@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { schedule } from "../src/scheduler.js";
-import type { SchedulerInput, PlannedWorkout, IntervalsEvent, Config } from "../src/types.js";
+import type { SchedulerInput, IntervalsEvent, Config } from "../src/types.js";
 
 const BASE_CONFIG: Config = {
   weight_training: {
@@ -67,9 +67,7 @@ describe("schedule", () => {
 
   it("spaces weight sessions at least 2 days apart", () => {
     const result = schedule(makeInput());
-    const weightDays = result
-      .map((w, i) => (w.type === "weights" ? i : -1))
-      .filter((i) => i >= 0);
+    const weightDays = result.map((w, i) => (w.type === "weights" ? i : -1)).filter((i) => i >= 0);
     expect(weightDays).toHaveLength(2);
     expect(weightDays[1] - weightDays[0]).toBeGreaterThanOrEqual(2);
   });

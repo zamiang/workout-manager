@@ -12,16 +12,14 @@ const MOCK_EVENTS: IntervalsEvent[] = [
   },
 ];
 
-const MOCK_WELLNESS = [
-  { id: "2026-04-19", ctl: 55, atl: 60, tsb: -5 },
-];
+const MOCK_WELLNESS = [{ id: "2026-04-19", ctl: 55, atl: 60, tsb: -5 }];
 
 describe("IntervalsClient", () => {
   let client: IntervalsClient;
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: ReturnType<typeof vi.fn> & typeof globalThis.fetch;
 
   beforeEach(() => {
-    mockFetch = vi.fn();
+    mockFetch = vi.fn() as typeof mockFetch;
     client = new IntervalsClient("test-api-key", mockFetch);
   });
 
