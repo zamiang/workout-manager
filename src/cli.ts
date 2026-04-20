@@ -30,7 +30,7 @@ function requireEnv(name: string): string {
   return val;
 }
 
-function formatPlan(workouts: PlannedWorkout[]): string {
+export function formatPlan(workouts: PlannedWorkout[]): string {
   const lines = workouts.map((w) => {
     const day = new Date(w.date + "T00:00:00").toLocaleDateString("en-US", {
       weekday: "short",
@@ -48,7 +48,7 @@ function formatPlan(workouts: PlannedWorkout[]): string {
   return lines.join("\n");
 }
 
-function workoutToEvent(w: PlannedWorkout): IntervalsEvent {
+export function workoutToEvent(w: PlannedWorkout): IntervalsEvent {
   const typeMap: Record<string, string> = {
     cycling: "Ride",
     low_cadence: "Ride",

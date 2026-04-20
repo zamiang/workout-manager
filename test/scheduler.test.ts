@@ -114,4 +114,61 @@ describe("schedule", () => {
       expect(ride.intensity).toBe("easy");
     }
   });
+
+  it("returns an empty plan when every day is already locked", () => {
+    const existing: IntervalsEvent[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date("2026-04-20T00:00:00");
+      d.setDate(d.getDate() + i);
+      existing.push({
+        id: i + 1,
+        start_date_local: d.toISOString().slice(0, 10),
+        name: "Existing",
+        category: "WORKOUT",
+        type: "Ride",
+      });
+    }
+    const result = schedule(makeInput({ existingEvents: existing }));
+    expect(result).toHaveLength(0);
+  });
+
+  it("uses moderate intensity cycling when TSB is between thresholds", () => {
+    const result = schedule(
+      makeInput({
+        trainingLoad: { ctl: 50, atl: 52, tsb: 0 },
+      }),
+    );
+    const cycling = result.filter((w) => w.type === "cycling");
+    expect(cycling.length).toBeGreaterThan(0);
+    // Moderate TSB allows moderate or easy (easy only when needed to avoid
+    // back-to-back hard). "hard" would violate the classification.
+    for (const ride of cycling) {
+      expect(["moderate", "easy"]).toContain(ride.intensity);
+    }
+  });
+
+  it("uses wotd_name for hard rides when provided", () => {
+    const result = schedule(
+      makeInput({
+        trainingLoad: { ctl: 50, atl: 40, tsb: 10 },
+        xertInfo: {
+          ftp: 250,
+          ltp: 210,
+          hie: 22,
+          pp: 1100,
+          training_status: "Fresh",
+          focus: "Endurance",
+          wotd_name: "SMART Workout 42",
+          wotd_description: "4x4min VO2max",
+        },
+      }),
+    );
+    const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+    expect(hardRides.length).toBeGreaterThan(0);
+    for (const ride of hardRides) {
+      expect(ride.name).toBe("SMART Workout 42");
+      expect(ride.description).toContain("SMART Workout 42");
+      expect(ride.description).toContain("4x4min VO2max");
+    }
+  });
 });

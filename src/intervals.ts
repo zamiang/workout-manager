@@ -1,6 +1,8 @@
 import type { IntervalsEvent, TrainingLoad } from "./types.js";
 
 const BASE_URL = "https://intervals.icu/api/v1";
+// "0" is Intervals.icu's convention for the authenticated user — resolves to
+// whoever owns the API key.
 const ATHLETE_ID = "0";
 
 type FetchFn = typeof globalThis.fetch;
@@ -34,11 +36,17 @@ export class IntervalsClient {
       throw new Error(`Intervals.icu API error (${res.status}): ${await res.text()}`);
     }
     const data = await res.json();
+    // Wellness endpoint returns an array for date ranges; empty on days with
+    // no recorded wellness (e.g. today before sync).
     const entry = Array.isArray(data) ? data[0] : data;
+    if (!entry || typeof entry !== "object") {
+      return { ctl: 0, atl: 0, tsb: 0 };
+    }
+    const e = entry as Record<string, unknown>;
     return {
-      ctl: entry.ctl ?? 0,
-      atl: entry.atl ?? 0,
-      tsb: entry.tsb ?? 0,
+      ctl: typeof e.ctl === "number" ? e.ctl : 0,
+      atl: typeof e.atl === "number" ? e.atl : 0,
+      tsb: typeof e.tsb === "number" ? e.tsb : 0,
     };
   }
 
