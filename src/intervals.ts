@@ -43,10 +43,12 @@ export class IntervalsClient {
       return { ctl: 0, atl: 0, tsb: 0 };
     }
     const e = entry as Record<string, unknown>;
+    const ctl = typeof e.ctl === "number" ? e.ctl : 0;
+    const atl = typeof e.atl === "number" ? e.atl : 0;
     return {
-      ctl: typeof e.ctl === "number" ? e.ctl : 0,
-      atl: typeof e.atl === "number" ? e.atl : 0,
-      tsb: typeof e.tsb === "number" ? e.tsb : 0,
+      ctl,
+      atl,
+      tsb: typeof e.tsb === "number" ? e.tsb : ctl - atl,
     };
   }
 
