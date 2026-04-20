@@ -5,9 +5,34 @@ import type { Config, SchedulingConfig, WorkoutDefinition } from "./types.js";
 const SCHEDULING_DEFAULTS: SchedulingConfig = {
   tsb_fresh: 5,
   tsb_fatigued: -10,
+  tsb_very_fatigued: -20,
   weight_sessions: 2,
+  weight_sessions_very_fatigued: 1,
   min_weight_gap_days: 2,
 };
+
+function validateScheduling(raw: unknown): Partial<SchedulingConfig> {
+  if (raw == null) return {};
+  if (typeof raw !== "object") {
+    throw new Error("scheduling must be an object");
+  }
+  const obj = raw as Record<string, unknown>;
+  const out: Partial<SchedulingConfig> = {};
+  const numericFields: (keyof SchedulingConfig)[] = [
+    "tsb_fresh",
+    "tsb_fatigued",
+    "weight_sessions",
+    "min_weight_gap_days",
+  ];
+  for (const field of numericFields) {
+    if (obj[field] === undefined) continue;
+    if (typeof obj[field] !== "number") {
+      throw new Error(`scheduling.${field} must be a number`);
+    }
+    out[field] = obj[field] as number;
+  }
+  return out;
+}
 
 function validateWorkout(raw: unknown, field: string): WorkoutDefinition {
   if (!raw || typeof raw !== "object") {
@@ -43,7 +68,7 @@ export async function loadConfig(filePath: string): Promise<Config> {
 
   const scheduling: SchedulingConfig = {
     ...SCHEDULING_DEFAULTS,
-    ...(doc.scheduling ?? {}),
+    ...validateScheduling(doc.scheduling),
   };
 
   return { weight_training, low_cadence, scheduling };

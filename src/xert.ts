@@ -1,6 +1,6 @@
 import type { XertTrainingInfo } from "./types.js";
 
-const BASE_URL = "https://www.xertonline.com/oauth";
+const OAUTH_URL = "https://www.xertonline.com/oauth";
 
 type FetchFn = typeof globalThis.fetch;
 
@@ -23,9 +23,12 @@ export class XertClient {
       password: this.password,
     });
 
-    const res = await this.fetch(`${BASE_URL}/token`, {
+    const res = await this.fetch(`${OAUTH_URL}/token`, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: "Basic " + Buffer.from("xert_public:xert_public").toString("base64"),
+      },
       body: body.toString(),
     });
 
@@ -42,7 +45,7 @@ export class XertClient {
       throw new Error("Not authenticated — call authenticate() first");
     }
 
-    const res = await this.fetch(`${BASE_URL}/training_info`, {
+    const res = await this.fetch(`${OAUTH_URL}/training_info`, {
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
       },
@@ -53,15 +56,16 @@ export class XertClient {
     }
 
     const data = await res.json();
+    const sig = data.signature ?? {};
     return {
-      ftp: data.ftp,
-      ltp: data.ltp,
-      hie: data.hie,
-      pp: data.pp,
-      training_status: data.training_status ?? "",
+      ftp: sig.ftp,
+      ltp: sig.ltp,
+      hie: sig.hie,
+      pp: sig.pp,
+      training_status: data.status ?? "",
       focus: data.focus ?? "",
-      wotd_name: data.wotd_name ?? undefined,
-      wotd_description: data.wotd_description ?? undefined,
+      wotd_name: data.wotd?.name ?? undefined,
+      wotd_description: data.wotd?.description ?? undefined,
     };
   }
 }

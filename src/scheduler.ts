@@ -13,9 +13,18 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function classifyIntensity(tsb: number, config: Config): CyclingIntensity {
-  if (tsb > config.scheduling.tsb_fresh) return "hard";
-  if (tsb < config.scheduling.tsb_fatigued) return "easy";
+export type FatigueLevel = "fresh" | "moderate" | "fatigued" | "very_fatigued";
+
+export function classifyFatigue(tsb: number, config: Config): FatigueLevel {
+  if (tsb < config.scheduling.tsb_very_fatigued) return "very_fatigued";
+  if (tsb < config.scheduling.tsb_fatigued) return "fatigued";
+  if (tsb > config.scheduling.tsb_fresh) return "fresh";
+  return "moderate";
+}
+
+function classifyIntensity(fatigue: FatigueLevel): CyclingIntensity {
+  if (fatigue === "fresh") return "hard";
+  if (fatigue === "fatigued" || fatigue === "very_fatigued") return "easy";
   return "moderate";
 }
 
@@ -37,6 +46,9 @@ function buildCyclingDescription(intensity: CyclingIntensity, xert: XertTraining
   }
 }
 
+// Greedy placement in a fixed order. Earlier phases have stricter placement
+// rules (low-cadence wants mid-week; weights need spacing), so they claim
+// slots first. Cycling fills whatever is left.
 export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const { startDate, existingEvents, trainingLoad, xertInfo, config } = input;
   const days = 7;
@@ -54,7 +66,12 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   // Available day indices (not locked)
   const available = dates.map((d, i) => (lockedDates.has(d) ? -1 : i)).filter((i) => i >= 0);
 
-  const intensity = classifyIntensity(trainingLoad.tsb, config);
+  const fatigue = classifyFatigue(trainingLoad.tsb, config);
+  const intensity = classifyIntensity(fatigue);
+  const veryFatigued = fatigue === "very_fatigued";
+  const weightSessionsTarget = veryFatigued
+    ? scheduling.weight_sessions_very_fatigued
+    : scheduling.weight_sessions;
 
   // Assign workout types to available slots
   const plan: (PlannedWorkout | null)[] = new Array(days).fill(null);
@@ -71,17 +88,21 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     return false;
   }
 
-  // 1. Place low cadence — pick a day with moderate freshness, avoiding edges if possible
-  const lcCandidates = available.filter((i) => !wouldCreateBackToBack(i, true));
-  const lcIdx = lcCandidates.find((i) => i >= 2 && i <= 4) ?? lcCandidates[0];
-  if (lcIdx !== undefined) {
-    plan[lcIdx] = {
-      date: dates[lcIdx],
-      type: "low_cadence",
-      name: low_cadence.name,
-      description: low_cadence.description,
-      intensity: "hard",
-    };
+  // 1. Place low cadence — pick a day with moderate freshness, avoiding edges if possible.
+  // Skipped entirely when very fatigued: the structured intensity isn't worth the
+  // recovery cost when TSB is that negative.
+  if (!veryFatigued) {
+    const lcCandidates = available.filter((i) => !wouldCreateBackToBack(i, true));
+    const lcIdx = lcCandidates.find((i) => i >= 2 && i <= 4) ?? lcCandidates[0];
+    if (lcIdx !== undefined) {
+      plan[lcIdx] = {
+        date: dates[lcIdx],
+        type: "low_cadence",
+        name: low_cadence.name,
+        description: low_cadence.description,
+        intensity: "hard",
+      };
+    }
   }
 
   // 2. Place weight training — 2 sessions, spaced min_weight_gap_days apart
@@ -97,7 +118,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
       continue;
     }
     weightSlots.push(i);
-    if (weightSlots.length >= scheduling.weight_sessions) break;
+    if (weightSlots.length >= weightSessionsTarget) break;
   }
 
   for (const i of weightSlots) {

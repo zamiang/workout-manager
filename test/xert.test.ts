@@ -9,14 +9,19 @@ const MOCK_TOKEN_RESPONSE = {
 };
 
 const MOCK_TRAINING_INFO = {
-  ftp: 250,
-  ltp: 210,
-  hie: 22,
-  pp: 1100,
-  training_status: "Tired",
+  success: true,
+  status: "Tired",
+  signature: {
+    ftp: 250,
+    ltp: 210,
+    hie: 22,
+    pp: 1100,
+  },
   focus: "Endurance",
-  wotd_name: "Easy Endurance Ride",
-  wotd_description: "60 min zone 2",
+  wotd: {
+    name: "Easy Endurance Ride",
+    description: "60 min zone 2",
+  },
 };
 
 describe("XertClient", () => {
@@ -41,7 +46,10 @@ describe("XertClient", () => {
         "https://www.xertonline.com/oauth/token",
         expect.objectContaining({
           method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          headers: expect.objectContaining({
+            "Content-Type": "application/x-www-form-urlencoded",
+            Authorization: expect.stringMatching(/^Basic /),
+          }),
           body: expect.stringContaining("grant_type=password"),
         }),
       );

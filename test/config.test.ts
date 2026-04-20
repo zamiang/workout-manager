@@ -66,7 +66,9 @@ low_cadence:
 
     expect(config.scheduling.tsb_fresh).toBe(5);
     expect(config.scheduling.tsb_fatigued).toBe(-10);
+    expect(config.scheduling.tsb_very_fatigued).toBe(-20);
     expect(config.scheduling.weight_sessions).toBe(2);
+    expect(config.scheduling.weight_sessions_very_fatigued).toBe(1);
     expect(config.scheduling.min_weight_gap_days).toBe(2);
   });
 
@@ -94,5 +96,51 @@ weight_training:
     await fs.writeFile(file, bad, "utf8");
 
     await expect(loadConfig(file)).rejects.toThrow("low_cadence");
+  });
+
+  it("applies a single scheduling override while keeping other defaults", async () => {
+    const yaml = `
+weight_training:
+  name: "Strength"
+  duration_minutes: 60
+  description: "test"
+
+low_cadence:
+  name: "LC"
+  duration_minutes: 60
+  description: "test"
+
+scheduling:
+  tsb_fresh: 10
+`;
+    const file = path.join(tmpDir, "config.yaml");
+    await fs.writeFile(file, yaml, "utf8");
+
+    const config = await loadConfig(file);
+    expect(config.scheduling.tsb_fresh).toBe(10);
+    expect(config.scheduling.tsb_fatigued).toBe(-10);
+    expect(config.scheduling.weight_sessions).toBe(2);
+    expect(config.scheduling.min_weight_gap_days).toBe(2);
+  });
+
+  it("throws when a scheduling field has the wrong type", async () => {
+    const yaml = `
+weight_training:
+  name: "Strength"
+  duration_minutes: 60
+  description: "test"
+
+low_cadence:
+  name: "LC"
+  duration_minutes: 60
+  description: "test"
+
+scheduling:
+  tsb_fresh: "five"
+`;
+    const file = path.join(tmpDir, "config.yaml");
+    await fs.writeFile(file, yaml, "utf8");
+
+    await expect(loadConfig(file)).rejects.toThrow("tsb_fresh");
   });
 });

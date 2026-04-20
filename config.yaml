@@ -37,10 +37,27 @@ weight_training:
 low_cadence:
   name: "Low Cadence Strength Intervals"
   duration_minutes: 60
-  description: "Seated low-cadence work targeting neuromuscular power — user to fill in structured steps"
+  description: |
+    Warm-up (15 min)
+    Easy Zone 2 spin at natural cadence (85-95 rpm), building heart rate gradually.
+
+    Main Set: 4 x 10 min @ 55-65 rpm
+    Seated, sustained threshold effort (85-95% FTP). Stay smooth — no rocking,
+    no mashing. Focus on even pressure through the full pedal stroke. The goal
+    is neuromuscular recruitment, not max watts.
+    5 min easy spin between intervals at 90+ rpm to flush the legs.
+
+    Cooldown (10 min)
+    Easy Zone 1 spin at 95+ rpm.
+
+    Notes
+    If cadence drifts above 65 rpm, shift up or add resistance. If form breaks
+    down (hips rocking, lower back engaging), end the interval early.
 
 scheduling:
   tsb_fresh: 5
   tsb_fatigued: -10
+  tsb_very_fatigued: -20
   weight_sessions: 2
+  weight_sessions_very_fatigued: 1
   min_weight_gap_days: 2
