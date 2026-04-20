@@ -3,7 +3,7 @@ import { loadConfig } from "./config.js";
 import { IntervalsClient } from "./intervals.js";
 import { XertClient } from "./xert.js";
 import { schedule } from "./scheduler.js";
-import type { PlannedWorkout, IntervalsEvent } from "./types.js";
+import type { PlannedWorkout, IntervalsEvent, WorkoutType } from "./types.js";
 
 interface ParsedArgs {
   command: "plan" | "status";
@@ -30,7 +30,7 @@ function requireEnv(name: string): string {
   return val;
 }
 
-function formatPlan(workouts: PlannedWorkout[]): string {
+export function formatPlan(workouts: PlannedWorkout[]): string {
   const lines = workouts.map((w) => {
     const day = new Date(w.date + "T00:00:00").toLocaleDateString("en-US", {
       weekday: "short",
@@ -48,18 +48,21 @@ function formatPlan(workouts: PlannedWorkout[]): string {
   return lines.join("\n");
 }
 
-function workoutToEvent(w: PlannedWorkout): IntervalsEvent {
-  const typeMap: Record<string, string> = {
-    cycling: "Ride",
-    low_cadence: "Ride",
-    weights: "WeightTraining",
-    rest: "Note",
-  };
+// Keyed by WorkoutType so adding a new variant is a compile error until the
+// mapping is updated.
+const WORKOUT_TYPE_TO_EVENT_TYPE: Record<WorkoutType, string> = {
+  cycling: "Ride",
+  low_cadence: "Ride",
+  weights: "WeightTraining",
+  rest: "Note",
+};
+
+export function workoutToEvent(w: PlannedWorkout): IntervalsEvent {
   return {
     start_date_local: w.date,
     name: w.name,
     category: w.type === "rest" ? "NOTE" : "WORKOUT",
-    type: typeMap[w.type] ?? "Other",
+    type: WORKOUT_TYPE_TO_EVENT_TYPE[w.type],
     description: w.description,
   };
 }

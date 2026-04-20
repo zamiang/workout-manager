@@ -114,4 +114,115 @@ describe("schedule", () => {
       expect(ride.intensity).toBe("easy");
     }
   });
+
+  it("returns an empty plan when every day is already locked", () => {
+    const existing: IntervalsEvent[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date("2026-04-20T00:00:00");
+      d.setDate(d.getDate() + i);
+      existing.push({
+        id: i + 1,
+        start_date_local: d.toISOString().slice(0, 10),
+        name: "Existing",
+        category: "WORKOUT",
+        type: "Ride",
+      });
+    }
+    const result = schedule(makeInput({ existingEvents: existing }));
+    expect(result).toHaveLength(0);
+  });
+
+  it("uses moderate intensity cycling when TSB is between thresholds", () => {
+    const result = schedule(
+      makeInput({
+        trainingLoad: { ctl: 50, atl: 52, tsb: 0 },
+      }),
+    );
+    const cycling = result.filter((w) => w.type === "cycling");
+    expect(cycling.length).toBeGreaterThan(0);
+    // Moderate TSB allows moderate or easy (easy only when needed to avoid
+    // back-to-back hard). "hard" would violate the classification.
+    for (const ride of cycling) {
+      expect(["moderate", "easy"]).toContain(ride.intensity);
+    }
+  });
+
+  it("treats TSB exactly at tsb_fresh as moderate, not hard", () => {
+    const result = schedule(
+      makeInput({
+        // tsb_fresh is 5; classifyIntensity uses strict `>`, so 5 is moderate.
+        trainingLoad: { ctl: 50, atl: 45, tsb: 5 },
+      }),
+    );
+    const cycling = result.filter((w) => w.type === "cycling");
+    expect(cycling.length).toBeGreaterThan(0);
+    for (const ride of cycling) {
+      expect(["moderate", "easy"]).toContain(ride.intensity);
+    }
+  });
+
+  it("treats TSB exactly at tsb_fatigued as moderate, not easy-forced", () => {
+    const result = schedule(
+      makeInput({
+        trainingLoad: { ctl: 50, atl: 60, tsb: -10 },
+      }),
+    );
+    const cycling = result.filter((w) => w.type === "cycling");
+    // Exact boundary is moderate — at least one moderate ride should exist
+    // unless every cycling slot was downgraded to easy for back-to-back reasons.
+    const moderateCount = cycling.filter((w) => w.intensity === "moderate").length;
+    expect(moderateCount).toBeGreaterThan(0);
+  });
+
+  it("degrades gracefully when most days are locked", () => {
+    // Only dates[1] and dates[3] open; algorithm must not crash and must
+    // return only what fits (no duplicate placements, no events on locked dates).
+    const existing: IntervalsEvent[] = [
+      "2026-04-20",
+      "2026-04-22",
+      "2026-04-24",
+      "2026-04-25",
+      "2026-04-26",
+    ].map((d, i) => ({
+      id: i + 1,
+      start_date_local: d,
+      name: "Existing",
+      category: "WORKOUT",
+      type: "Ride",
+    }));
+
+    const result = schedule(makeInput({ existingEvents: existing }));
+
+    expect(result.length).toBeLessThanOrEqual(2);
+    const dates = result.map((w) => w.date);
+    expect(new Set(dates).size).toBe(dates.length); // no duplicate dates
+    for (const w of result) {
+      expect(["2026-04-21", "2026-04-23"]).toContain(w.date);
+    }
+  });
+
+  it("uses wotd_name for hard rides when provided", () => {
+    const result = schedule(
+      makeInput({
+        trainingLoad: { ctl: 50, atl: 40, tsb: 10 },
+        xertInfo: {
+          ftp: 250,
+          ltp: 210,
+          hie: 22,
+          pp: 1100,
+          training_status: "Fresh",
+          focus: "Endurance",
+          wotd_name: "SMART Workout 42",
+          wotd_description: "4x4min VO2max",
+        },
+      }),
+    );
+    const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+    expect(hardRides.length).toBeGreaterThan(0);
+    for (const ride of hardRides) {
+      expect(ride.name).toBe("SMART Workout 42");
+      expect(ride.description).toContain("SMART Workout 42");
+      expect(ride.description).toContain("4x4min VO2max");
+    }
+  });
 });

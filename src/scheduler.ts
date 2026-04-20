@@ -37,6 +37,9 @@ function buildCyclingDescription(intensity: CyclingIntensity, xert: XertTraining
   }
 }
 
+// Greedy placement in a fixed order. Earlier phases have stricter placement
+// rules (low-cadence wants mid-week; weights need spacing), so they claim
+// slots first. Cycling fills whatever is left.
 export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const { startDate, existingEvents, trainingLoad, xertInfo, config } = input;
   const days = 7;
