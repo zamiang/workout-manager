@@ -9,7 +9,9 @@ export interface WorkoutDefinition {
 export interface SchedulingConfig {
   tsb_fresh: number; // default 5
   tsb_fatigued: number; // default -10
+  tsb_very_fatigued: number; // default -20 — below this, drop low-cadence and reduce weights
   weight_sessions: number; // default 2
+  weight_sessions_very_fatigued: number; // default 1 — weight sessions when TSB < tsb_very_fatigued
   min_weight_gap_days: number; // default 2
 }
 

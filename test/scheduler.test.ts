@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { schedule } from "../src/scheduler.js";
+import { schedule, classifyFatigue } from "../src/scheduler.js";
 import type { SchedulerInput, IntervalsEvent, Config } from "../src/types.js";
 
 const BASE_CONFIG: Config = {
@@ -16,7 +16,9 @@ const BASE_CONFIG: Config = {
   scheduling: {
     tsb_fresh: 5,
     tsb_fatigued: -10,
+    tsb_very_fatigued: -20,
     weight_sessions: 2,
+    weight_sessions_very_fatigued: 1,
     min_weight_gap_days: 2,
   },
 };
@@ -199,6 +201,44 @@ describe("schedule", () => {
     for (const w of result) {
       expect(["2026-04-21", "2026-04-23"]).toContain(w.date);
     }
+  });
+
+  describe("very fatigued (TSB below tsb_very_fatigued)", () => {
+    const veryFatiguedLoad = { ctl: 56, atl: 86, tsb: -30 };
+
+    it("drops the low-cadence session entirely", () => {
+      const result = schedule(makeInput({ trainingLoad: veryFatiguedLoad }));
+      expect(result.filter((w) => w.type === "low_cadence")).toHaveLength(0);
+    });
+
+    it("reduces weight sessions to weight_sessions_very_fatigued", () => {
+      const result = schedule(makeInput({ trainingLoad: veryFatiguedLoad }));
+      expect(result.filter((w) => w.type === "weights")).toHaveLength(1);
+    });
+
+    it("keeps all cycling at easy intensity", () => {
+      const result = schedule(makeInput({ trainingLoad: veryFatiguedLoad }));
+      const cycling = result.filter((w) => w.type === "cycling");
+      for (const ride of cycling) {
+        expect(ride.intensity).toBe("easy");
+      }
+    });
+  });
+
+  describe("classifyFatigue", () => {
+    const cfg = BASE_CONFIG;
+    it("returns very_fatigued below tsb_very_fatigued", () => {
+      expect(classifyFatigue(-25, cfg)).toBe("very_fatigued");
+    });
+    it("returns fatigued between tsb_very_fatigued and tsb_fatigued", () => {
+      expect(classifyFatigue(-15, cfg)).toBe("fatigued");
+    });
+    it("returns moderate between tsb_fatigued and tsb_fresh", () => {
+      expect(classifyFatigue(0, cfg)).toBe("moderate");
+    });
+    it("returns fresh above tsb_fresh", () => {
+      expect(classifyFatigue(10, cfg)).toBe("fresh");
+    });
   });
 
   it("uses wotd_name for hard rides when provided", () => {
