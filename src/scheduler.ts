@@ -46,24 +46,26 @@ function buildCyclingDescription(intensity: CyclingIntensity, xert: XertTraining
   }
 }
 
-// Greedy placement in a fixed order. Earlier phases have stricter placement
-// rules (low-cadence wants mid-week; weights need spacing), so they claim
-// slots first. Cycling fills whatever is left.
+// Polarized placement: consolidate stress onto "hard days" (low-cadence +
+// hard-cycling target days) so weights stack with them in the same session,
+// preserving full-recovery days for easy rides or rest. Within a stacked day,
+// the cycling workout precedes the weights session — hard intervals are done
+// on fresh legs; weights go last so the aerobic AMPK signal has begun to fade.
+//
+// Fatigue tiers:
+//   - fresh:          hard cycling targets + weights co-locate on both
+//   - moderate/fatigued: only low-cadence is a natural hard day; weights
+//                        stack with it and overflow to their own day(s)
+//   - very_fatigued:  day 0 reserved for rest; low-cadence dropped; a single
+//                     strength session placed mid-week
 export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const { startDate, existingEvents, trainingLoad, xertInfo, config } = input;
   const days = 7;
   const { scheduling, weight_training, low_cadence } = config;
 
-  // Build set of dates that already have events
   const lockedDates = new Set(existingEvents.map((e) => e.start_date_local));
-
-  // Generate the 7 dates
   const dates: string[] = [];
-  for (let i = 0; i < days; i++) {
-    dates.push(addDays(startDate, i));
-  }
-
-  // Available day indices (not locked)
+  for (let i = 0; i < days; i++) dates.push(addDays(startDate, i));
   const available = dates.map((d, i) => (lockedDates.has(d) ? -1 : i)).filter((i) => i >= 0);
 
   const fatigue = classifyFatigue(trainingLoad.tsb, config);
@@ -73,91 +75,143 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     ? scheduling.weight_sessions_very_fatigued
     : scheduling.weight_sessions;
 
-  // Assign workout types to available slots
-  const plan: (PlannedWorkout | null)[] = new Array(days).fill(null);
-
-  // Helper: check if assigning a hard workout at index i would create back-to-back hard
-  function wouldCreateBackToBack(idx: number, hardType: boolean): boolean {
-    if (!hardType) return false;
-    if (idx > 0 && plan[idx - 1] && isHard(plan[idx - 1]!.type, plan[idx - 1]!.intensity)) {
-      return true;
-    }
-    if (idx < days - 1 && plan[idx + 1] && isHard(plan[idx + 1]!.type, plan[idx + 1]!.intensity)) {
-      return true;
-    }
+  // Each day can hold multiple workouts (hard cycling + weights = one stacked
+  // training day, two PlannedWorkout entries).
+  const plan: PlannedWorkout[][] = Array.from({ length: days }, () => []);
+  const isHardDay = (idx: number): boolean =>
+    plan[idx].some((w) => isHard(w.type, w.intensity));
+  const isEmpty = (idx: number): boolean => plan[idx].length === 0;
+  const wouldCreateBackToBack = (idx: number): boolean => {
+    if (idx > 0 && isHardDay(idx - 1)) return true;
+    if (idx < days - 1 && isHardDay(idx + 1)) return true;
     return false;
+  };
+  const respectsWeightGap = (idx: number, slots: number[]): boolean =>
+    slots.every((s) => Math.abs(idx - s) >= scheduling.min_weight_gap_days);
+
+  // Phase 0: when very fatigued, reserve day 0 as rest before any hard placement.
+  if (veryFatigued && available.includes(0)) {
+    plan[0].push({
+      date: dates[0],
+      type: "rest",
+      name: "Rest Day",
+      description: "Priority recovery — starting the week very fatigued",
+      intensity: "easy",
+    });
   }
 
-  // 1. Place low cadence — pick a day with moderate freshness, avoiding edges if possible.
-  // Skipped entirely when very fatigued: the structured intensity isn't worth the
-  // recovery cost when TSB is that negative.
+  // Phase 1: low-cadence (mid-week), unless very fatigued.
+  let lcIdx: number | undefined;
   if (!veryFatigued) {
-    const lcCandidates = available.filter((i) => !wouldCreateBackToBack(i, true));
-    const lcIdx = lcCandidates.find((i) => i >= 2 && i <= 4) ?? lcCandidates[0];
+    const lcCandidates = available.filter((i) => isEmpty(i) && !wouldCreateBackToBack(i));
+    lcIdx = lcCandidates.find((i) => i >= 2 && i <= 4) ?? lcCandidates[0];
     if (lcIdx !== undefined) {
-      plan[lcIdx] = {
+      plan[lcIdx].push({
         date: dates[lcIdx],
         type: "low_cadence",
         name: low_cadence.name,
         description: low_cadence.description,
         intensity: "hard",
-      };
+      });
     }
   }
 
-  // 2. Place weight training — 2 sessions, spaced min_weight_gap_days apart
-  const weightSlots: number[] = [];
-  const remainingAvailable = available.filter((i) => plan[i] === null);
-
-  for (const i of remainingAvailable) {
-    if (wouldCreateBackToBack(i, true)) continue;
-    if (
-      weightSlots.length > 0 &&
-      i - weightSlots[weightSlots.length - 1] < scheduling.min_weight_gap_days
-    ) {
-      continue;
+  // Phase 2: pre-select hard cycling target days (only when fresh enough).
+  // These days will get hard cycling AND become co-location sites for weights.
+  // We cap at weightSessionsTarget so every target can host a strength session.
+  const hardCyclingTargets = new Set<number>();
+  if (intensity === "hard") {
+    for (const i of available) {
+      if (hardCyclingTargets.size >= weightSessionsTarget) break;
+      if (!isEmpty(i)) continue;
+      if (wouldCreateBackToBack(i)) continue;
+      // Spacing: hard cycling days follow min_weight_gap_days from each other
+      // and from the low-cadence day, so co-located weights get proper rest.
+      const existingHardSpots = [lcIdx, ...hardCyclingTargets].filter(
+        (x): x is number => x !== undefined,
+      );
+      if (!respectsWeightGap(i, existingHardSpots)) continue;
+      hardCyclingTargets.add(i);
+      plan[i].push({
+        date: dates[i],
+        type: "cycling",
+        name: xertInfo.wotd_name ?? "Hard Ride",
+        description: buildCyclingDescription("hard", xertInfo),
+        intensity: "hard",
+      });
     }
-    weightSlots.push(i);
+  }
+
+  // Phase 3: place weights, co-locating with hard days first, then overflowing.
+  const weightSlots: number[] = [];
+  const hardStackOrder = [
+    ...(lcIdx !== undefined ? [lcIdx] : []),
+    ...[...hardCyclingTargets].sort((a, b) => a - b),
+  ].sort((a, b) => a - b);
+  for (const i of hardStackOrder) {
     if (weightSlots.length >= weightSessionsTarget) break;
+    if (!respectsWeightGap(i, weightSlots)) continue;
+    weightSlots.push(i);
+  }
+
+  if (weightSlots.length < weightSessionsTarget) {
+    // Overflow: find additional days for weights. Candidates are empty days
+    // (plus hard-cycling target days that weren't picked above, but those are
+    // already "full" from our POV). Very_fatigued prefers mid-week.
+    const overflowCandidates = available.filter(
+      (i) => isEmpty(i) && !weightSlots.includes(i),
+    );
+    const ordered = veryFatigued
+      ? [...overflowCandidates].sort((a, b) => {
+          const midA = a >= 2 && a <= 4 ? 0 : 1;
+          const midB = b >= 2 && b <= 4 ? 0 : 1;
+          return midA - midB || a - b;
+        })
+      : overflowCandidates;
+    for (const i of ordered) {
+      if (weightSlots.length >= weightSessionsTarget) break;
+      if (wouldCreateBackToBack(i)) continue;
+      if (!respectsWeightGap(i, weightSlots)) continue;
+      weightSlots.push(i);
+    }
   }
 
   for (const i of weightSlots) {
-    plan[i] = {
+    plan[i].push({
       date: dates[i],
       type: "weights",
       name: weight_training.name,
       description: weight_training.description,
       intensity: "hard",
-    };
+    });
   }
 
-  // 3. Assign rest day — pick the day after the hardest cluster
-  const restCandidates = available.filter((i) => plan[i] === null);
+  // Phase 4: rest day — placed after the hardest cluster. Skipped if day 0
+  // rest already exists and no natural "after hard" slot is better; in that
+  // case we still try to find a second rest for recovery from the weights.
+  const restCandidates = available.filter((i) => isEmpty(i));
   const restIdx =
-    restCandidates.find(
-      (i) => i > 0 && plan[i - 1] !== null && isHard(plan[i - 1]!.type, plan[i - 1]!.intensity),
-    ) ?? restCandidates[restCandidates.length - 1];
-
+    restCandidates.find((i) => i > 0 && isHardDay(i - 1)) ??
+    restCandidates[restCandidates.length - 1];
   if (restIdx !== undefined) {
-    plan[restIdx] = {
+    plan[restIdx].push({
       date: dates[restIdx],
       type: "rest",
       name: "Rest Day",
       description: "Recovery — no planned workout",
       intensity: "easy",
-    };
+    });
   }
 
-  // 4. Fill remaining with cycling
+  // Phase 5: fill remaining empty days with cycling at the default intensity,
+  // downgrading to easy if it would create back-to-back hard.
   for (let i = 0; i < days; i++) {
-    if (plan[i] !== null || lockedDates.has(dates[i])) continue;
-
+    if (!isEmpty(i) || lockedDates.has(dates[i])) continue;
     let rideIntensity = intensity;
-    if (wouldCreateBackToBack(i, rideIntensity === "hard")) {
+    if (rideIntensity === "hard" && wouldCreateBackToBack(i)) {
       rideIntensity = "easy";
     }
-
-    plan[i] = {
+    plan[i].push({
       date: dates[i],
       type: "cycling",
       name:
@@ -168,9 +222,21 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
             : (xertInfo.wotd_name ?? "Hard Ride"),
       description: buildCyclingDescription(rideIntensity, xertInfo),
       intensity: rideIntensity,
-    };
+    });
   }
 
-  // Return only planned workouts (skip locked dates)
-  return plan.filter((w): w is PlannedWorkout => w !== null);
+  // Flatten, preserving date order. Within a day, cycling precedes weights:
+  // hard intervals go first on fresh legs; weights go after the aerobic
+  // AMPK signal has begun to fade.
+  const typeRank = (t: WorkoutType): number => {
+    if (t === "rest") return 0;
+    if (t === "cycling" || t === "low_cadence") return 1;
+    return 2; // weights
+  };
+  const out: PlannedWorkout[] = [];
+  for (let i = 0; i < days; i++) {
+    const sorted = [...plan[i]].sort((a, b) => typeRank(a.type) - typeRank(b.type));
+    out.push(...sorted);
+  }
+  return out;
 }
