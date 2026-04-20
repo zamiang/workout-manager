@@ -78,14 +78,14 @@ describe("IntervalsClient", () => {
       expect(load).toEqual({ ctl: 0, atl: 0, tsb: 0 });
     });
 
-    it("defaults missing fields to zero", async () => {
+    it("defaults missing ctl/atl to zero and derives tsb from ctl - atl", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => [{ id: "2026-04-19", ctl: 55 }],
       });
 
       const load = await client.getTrainingLoad("2026-04-19");
-      expect(load).toEqual({ ctl: 55, atl: 0, tsb: 0 });
+      expect(load).toEqual({ ctl: 55, atl: 0, tsb: 55 });
     });
   });
 
