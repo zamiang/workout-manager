@@ -1,0 +1,43 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        with:
+          prompt: |
+            Review this pull request for the workout-planner CLI.
+
+            Focus on:
+            - Logic bugs in the scheduling algorithm (src/scheduler.ts), including
+              edge cases when days are locked, when slots are insufficient, and
+              at TSB classification boundaries.
+            - Correctness of Intervals.icu and Xert API calls — request shape,
+              response parsing, error handling, and auth header construction.
+            - TypeScript safety: any/unknown casts that bypass checking,
+              non-exhaustive switches over WorkoutType, and runtime-only
+              invariants that should be enforced by types.
+            - Test quality: tests that would pass even if the code were broken,
+              overly mocked tests, and critical paths without coverage.
+            - Configuration handling: silent defaults that could mask user
+              errors, or validation gaps.
+
+            Do not comment on formatting or style — Prettier and ESLint
+            already run in CI. Keep comments concrete with file:line refs.
