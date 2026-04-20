@@ -1,7 +1,6 @@
 import type { XertTrainingInfo } from "./types.js";
 
 const OAUTH_URL = "https://www.xertonline.com/oauth";
-const API_URL = "https://www.xertonline.com/xert";
 
 type FetchFn = typeof globalThis.fetch;
 
