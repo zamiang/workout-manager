@@ -66,7 +66,9 @@ low_cadence:
 
     expect(config.scheduling.tsb_fresh).toBe(5);
     expect(config.scheduling.tsb_fatigued).toBe(-10);
+    expect(config.scheduling.tsb_very_fatigued).toBe(-20);
     expect(config.scheduling.weight_sessions).toBe(2);
+    expect(config.scheduling.weight_sessions_very_fatigued).toBe(1);
     expect(config.scheduling.min_weight_gap_days).toBe(2);
   });
 

@@ -2,7 +2,7 @@ import "dotenv/config";
 import { loadConfig } from "./config.js";
 import { IntervalsClient } from "./intervals.js";
 import { XertClient } from "./xert.js";
-import { schedule } from "./scheduler.js";
+import { schedule, classifyFatigue } from "./scheduler.js";
 import type { PlannedWorkout, IntervalsEvent, WorkoutType } from "./types.js";
 
 interface ParsedArgs {
@@ -123,7 +123,19 @@ async function main() {
     config,
   });
 
+  const fatigue = classifyFatigue(load.tsb, config);
+  const fatigueLabel: Record<string, string> = {
+    fresh: "fresh — scheduling hard rides",
+    moderate: "moderate — mixed intensity",
+    fatigued: "fatigued — cycling kept easy",
+    very_fatigued: "very fatigued — dropped low-cadence, reduced weights",
+  };
+
   console.log("=== Weekly Plan ===");
+  console.log(
+    `TSB ${load.tsb.toFixed(1)} (${fatigueLabel[fatigue] ?? fatigue}) — Xert: ${info.training_status || "n/a"}`,
+  );
+  console.log();
   console.log(formatPlan(planned));
   console.log();
 
