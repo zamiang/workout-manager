@@ -5,7 +5,9 @@ import type { Config, SchedulingConfig, WorkoutDefinition } from "./types.js";
 const SCHEDULING_DEFAULTS: SchedulingConfig = {
   tsb_fresh: 5,
   tsb_fatigued: -10,
+  tsb_very_fatigued: -20,
   weight_sessions: 2,
+  weight_sessions_very_fatigued: 1,
   min_weight_gap_days: 2,
 };
 
