@@ -78,8 +78,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   // Each day can hold multiple workouts (hard cycling + weights = one stacked
   // training day, two PlannedWorkout entries).
   const plan: PlannedWorkout[][] = Array.from({ length: days }, () => []);
-  const isHardDay = (idx: number): boolean =>
-    plan[idx].some((w) => isHard(w.type, w.intensity));
+  const isHardDay = (idx: number): boolean => plan[idx].some((w) => isHard(w.type, w.intensity));
   const isEmpty = (idx: number): boolean => plan[idx].length === 0;
   const wouldCreateBackToBack = (idx: number): boolean => {
     if (idx > 0 && isHardDay(idx - 1)) return true;
@@ -158,9 +157,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     // Overflow: find additional days for weights. Candidates are empty days
     // (plus hard-cycling target days that weren't picked above, but those are
     // already "full" from our POV). Very_fatigued prefers mid-week.
-    const overflowCandidates = available.filter(
-      (i) => isEmpty(i) && !weightSlots.includes(i),
-    );
+    const overflowCandidates = available.filter((i) => isEmpty(i) && !weightSlots.includes(i));
     const ordered = veryFatigued
       ? [...overflowCandidates].sort((a, b) => {
           const midA = a >= 2 && a <= 4 ? 0 : 1;

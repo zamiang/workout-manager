@@ -84,14 +84,11 @@ describe("schedule", () => {
 
   it("does not schedule hard workouts on consecutive dates", () => {
     const result = schedule(makeInput());
-    const hardDates = new Set(
-      result.filter((w) => isHardEntry(w)).map((w) => w.date),
-    );
+    const hardDates = new Set(result.filter((w) => isHardEntry(w)).map((w) => w.date));
     const sorted = [...hardDates].sort();
     for (let i = 1; i < sorted.length; i++) {
       const diff =
-        (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) /
-        (1000 * 60 * 60 * 24);
+        (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / (1000 * 60 * 60 * 24);
       if (diff === 1) {
         throw new Error(`Back-to-back hard dates: ${sorted[i - 1]} and ${sorted[i]}`);
       }
@@ -252,9 +249,7 @@ describe("schedule", () => {
       expect(weightDates).toHaveLength(2);
       for (const d of weightDates) {
         const sameDay = result.filter((w) => w.date === d);
-        const hasHardPartner = sameDay.some(
-          (w) => w.type !== "weights" && isHardEntry(w),
-        );
+        const hasHardPartner = sameDay.some((w) => w.type !== "weights" && isHardEntry(w));
         expect(hasHardPartner).toBe(true);
       }
     });
