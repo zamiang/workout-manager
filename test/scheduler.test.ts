@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { schedule, classifyFatigue } from "../src/scheduler.js";
-import type { SchedulerInput, IntervalsEvent, Config } from "../src/types.js";
+import type { SchedulerInput, IntervalsEvent, Config, PlannedWorkout } from "../src/types.js";
+
+function isHardEntry(w: PlannedWorkout): boolean {
+  return w.type === "weights" || w.type === "low_cadence" || w.intensity === "hard";
+}
 
 const BASE_CONFIG: Config = {
   weight_training: {
@@ -42,11 +46,12 @@ function makeInput(overrides: Partial<SchedulerInput> = {}): SchedulerInput {
 }
 
 describe("schedule", () => {
-  it("returns exactly 7 days of output", () => {
+  it("covers all 7 distinct dates in the week", () => {
     const result = schedule(makeInput());
-    expect(result).toHaveLength(7);
-    expect(result[0].date).toBe("2026-04-20");
-    expect(result[6].date).toBe("2026-04-26");
+    const distinctDates = new Set(result.map((w) => w.date));
+    expect(distinctDates.size).toBe(7);
+    expect(distinctDates.has("2026-04-20")).toBe(true);
+    expect(distinctDates.has("2026-04-26")).toBe(true);
   });
 
   it("includes exactly 1 low cadence session", () => {
@@ -69,22 +74,23 @@ describe("schedule", () => {
 
   it("spaces weight sessions at least 2 days apart", () => {
     const result = schedule(makeInput());
-    const weightDays = result.map((w, i) => (w.type === "weights" ? i : -1)).filter((i) => i >= 0);
-    expect(weightDays).toHaveLength(2);
-    expect(weightDays[1] - weightDays[0]).toBeGreaterThanOrEqual(2);
+    const weightDates = result.filter((w) => w.type === "weights").map((w) => w.date);
+    expect(weightDates).toHaveLength(2);
+    const diffDays =
+      (new Date(weightDates[1]).getTime() - new Date(weightDates[0]).getTime()) /
+      (1000 * 60 * 60 * 24);
+    expect(diffDays).toBeGreaterThanOrEqual(2);
   });
 
-  it("does not schedule back-to-back hard days", () => {
+  it("does not schedule hard workouts on consecutive dates", () => {
     const result = schedule(makeInput());
-    for (let i = 1; i < result.length; i++) {
-      const prev = result[i - 1];
-      const curr = result[i];
-      const prevHard = prev.intensity === "hard";
-      const currHard = curr.intensity === "hard";
-      if (prevHard && currHard) {
-        throw new Error(
-          `Back-to-back hard days: ${prev.date} (${prev.type}) and ${curr.date} (${curr.type})`,
-        );
+    const hardDates = new Set(result.filter((w) => isHardEntry(w)).map((w) => w.date));
+    const sorted = [...hardDates].sort();
+    for (let i = 1; i < sorted.length; i++) {
+      const diff =
+        (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / (1000 * 60 * 60 * 24);
+      if (diff === 1) {
+        throw new Error(`Back-to-back hard dates: ${sorted[i - 1]} and ${sorted[i]}`);
       }
     }
   });
@@ -195,12 +201,58 @@ describe("schedule", () => {
 
     const result = schedule(makeInput({ existingEvents: existing }));
 
-    expect(result.length).toBeLessThanOrEqual(2);
-    const dates = result.map((w) => w.date);
-    expect(new Set(dates).size).toBe(dates.length); // no duplicate dates
+    const distinctDates = new Set(result.map((w) => w.date));
+    expect(distinctDates.size).toBeLessThanOrEqual(2);
     for (const w of result) {
       expect(["2026-04-21", "2026-04-23"]).toContain(w.date);
     }
+  });
+
+  describe("weights co-location (polarized stacking)", () => {
+    const freshLoad = { ctl: 50, atl: 40, tsb: 10 };
+
+    it("co-locates at least one weights session with the low-cadence day", () => {
+      const result = schedule(makeInput());
+      const lcDate = result.find((w) => w.type === "low_cadence")?.date;
+      const weightDates = new Set(result.filter((w) => w.type === "weights").map((w) => w.date));
+      expect(lcDate).toBeDefined();
+      expect(weightDates.has(lcDate!)).toBe(true);
+    });
+
+    it("places cycling before weights on the same date", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad }));
+      // Find a date with both cycling (any intensity) and weights
+      const byDate = new Map<string, PlannedWorkout[]>();
+      for (const w of result) {
+        const arr = byDate.get(w.date) ?? [];
+        arr.push(w);
+        byDate.set(w.date, arr);
+      }
+      let checked = 0;
+      for (const [, entries] of byDate) {
+        const cyclingTypes = new Set(["cycling", "low_cadence"]);
+        const hasCycling = entries.some((w) => cyclingTypes.has(w.type));
+        const hasWeights = entries.some((w) => w.type === "weights");
+        if (hasCycling && hasWeights) {
+          const cyclingIdx = entries.findIndex((w) => cyclingTypes.has(w.type));
+          const weightsIdx = entries.findIndex((w) => w.type === "weights");
+          expect(cyclingIdx).toBeLessThan(weightsIdx);
+          checked++;
+        }
+      }
+      expect(checked).toBeGreaterThan(0);
+    });
+
+    it("when fresh, both weights sessions land on hard-training days", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad }));
+      const weightDates = result.filter((w) => w.type === "weights").map((w) => w.date);
+      expect(weightDates).toHaveLength(2);
+      for (const d of weightDates) {
+        const sameDay = result.filter((w) => w.date === d);
+        const hasHardPartner = sameDay.some((w) => w.type !== "weights" && isHardEntry(w));
+        expect(hasHardPartner).toBe(true);
+      }
+    });
   });
 
   describe("very fatigued (TSB below tsb_very_fatigued)", () => {
@@ -222,6 +274,45 @@ describe("schedule", () => {
       for (const ride of cycling) {
         expect(ride.intensity).toBe("easy");
       }
+    });
+
+    it("places rest on day 0 (starts the week with recovery)", () => {
+      const result = schedule(makeInput({ trainingLoad: veryFatiguedLoad }));
+      const day0 = result.find((w) => w.date === "2026-04-20");
+      expect(day0?.type).toBe("rest");
+    });
+
+    it("places the weights session mid-week, not on day 0 or 1", () => {
+      const result = schedule(makeInput({ trainingLoad: veryFatiguedLoad }));
+      const weightsDay = result.find((w) => w.type === "weights")?.date;
+      expect(weightsDay).toBeDefined();
+      expect(["2026-04-22", "2026-04-23", "2026-04-24"]).toContain(weightsDay!);
+    });
+
+    it("adds a second rest day after the weights session", () => {
+      const result = schedule(makeInput({ trainingLoad: veryFatiguedLoad }));
+      const rests = result.filter((w) => w.type === "rest");
+      expect(rests.length).toBeGreaterThanOrEqual(2);
+      const weightsIdx = result.findIndex((w) => w.type === "weights");
+      expect(weightsIdx).toBeGreaterThan(0);
+      expect(result[weightsIdx + 1]?.type).toBe("rest");
+    });
+
+    it("skips the priority day-0 rest if day 0 is already locked", () => {
+      const existing: IntervalsEvent[] = [
+        {
+          id: 1,
+          start_date_local: "2026-04-20",
+          name: "Locked Ride",
+          category: "WORKOUT",
+          type: "Ride",
+        },
+      ];
+      const result = schedule(
+        makeInput({ trainingLoad: veryFatiguedLoad, existingEvents: existing }),
+      );
+      expect(result.find((w) => w.date === "2026-04-20")).toBeUndefined();
+      expect(result.filter((w) => w.type === "weights")).toHaveLength(1);
     });
   });
 
