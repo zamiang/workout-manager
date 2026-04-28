@@ -54,7 +54,9 @@ export class IntervalsClient {
     return data.map((entry) => {
       const load = parseWellnessEntry(entry);
       const date =
-        entry && typeof entry === "object" && typeof (entry as Record<string, unknown>).id === "string"
+        entry &&
+        typeof entry === "object" &&
+        typeof (entry as Record<string, unknown>).id === "string"
           ? ((entry as Record<string, unknown>).id as string)
           : "";
       return { date, ...load };

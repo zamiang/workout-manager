@@ -4,6 +4,7 @@ import { loadConfig } from "./config.js";
 import { IntervalsClient } from "./intervals.js";
 import { XertClient } from "./xert.js";
 import { schedule, classifyFatigue } from "./scheduler.js";
+import { computeDistribution, zoneLabel } from "./zones.js";
 import type { PlannedWorkout, IntervalsEvent, WorkoutType } from "./types.js";
 
 interface ParsedArgs {
@@ -44,7 +45,8 @@ export function formatPlan(workouts: PlannedWorkout[]): string {
           : w.type === "low_cadence"
             ? "LC"
             : "CY";
-    return `${w.date} (${day})  [${icon}]  ${w.name}  — ${w.intensity}`;
+    const zoneTag = w.targetZone ? ` (${zoneLabel(w.targetZone)})` : "";
+    return `${w.date} (${day})  [${icon}]  ${w.name}  — ${w.intensity}${zoneTag}`;
   });
   return lines.join("\n");
 }
@@ -109,12 +111,18 @@ async function main() {
   const endDate = new Date();
   endDate.setDate(endDate.getDate() + 6);
   const endStr = endDate.toISOString().slice(0, 10);
+  const lookbackStart = new Date();
+  lookbackStart.setDate(lookbackStart.getDate() - 28);
+  const lookbackStr = lookbackStart.toISOString().slice(0, 10);
 
-  const [events, load, info] = await Promise.all([
+  const [events, load, info, activities] = await Promise.all([
     intervals.getEvents(today, endStr),
     intervals.getTrainingLoad(today),
     xert.getTrainingInfo(),
+    intervals.getActivities(lookbackStr, today),
   ]);
+
+  const zoneDistribution = computeDistribution(activities);
 
   const planned = schedule({
     startDate: today,
@@ -122,6 +130,7 @@ async function main() {
     trainingLoad: load,
     xertInfo: info,
     config,
+    zoneDistribution,
   });
 
   const fatigue = classifyFatigue(load.tsb, config);

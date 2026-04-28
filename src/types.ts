@@ -1,3 +1,5 @@
+import type { Zone } from "./zones.js";
+
 // --- Config ---
 
 export interface WorkoutDefinition {
@@ -76,6 +78,7 @@ export interface PlannedWorkout {
   name: string;
   description: string;
   intensity: CyclingIntensity | "hard"; // weights and low_cadence are always "hard"
+  targetZone?: Zone; // set on hard cycling days when zone distribution is supplied
 }
 
 export interface SchedulerInput {
@@ -84,4 +87,5 @@ export interface SchedulerInput {
   trainingLoad: TrainingLoad;
   xertInfo: XertTrainingInfo;
   config: Config;
+  zoneDistribution?: Record<Zone, number>; // trailing TSS-weighted zone mix
 }
