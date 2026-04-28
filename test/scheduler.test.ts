@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { schedule, classifyFatigue } from "../src/scheduler.js";
+import { schedule, classifyFatigue, rampGuardTriggered } from "../src/scheduler.js";
+import { emptyDistribution } from "../src/zones.js";
 import type { SchedulerInput, IntervalsEvent, Config, PlannedWorkout } from "../src/types.js";
 
 function isHardEntry(w: PlannedWorkout): boolean {
@@ -24,6 +25,7 @@ const BASE_CONFIG: Config = {
     weight_sessions: 2,
     weight_sessions_very_fatigued: 1,
     min_weight_gap_days: 2,
+    max_weekly_ramp_pct: 7,
   },
 };
 
@@ -316,6 +318,50 @@ describe("schedule", () => {
     });
   });
 
+  describe("ramp guard", () => {
+    const freshLoad = { ctl: 50, atl: 40, tsb: 10 };
+
+    it("does not fire when rampRatePct is undefined", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad }));
+      const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+      expect(hardRides.length).toBeGreaterThan(0);
+    });
+
+    it("does not fire when rampRatePct is at or below threshold", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad, rampRatePct: 7 }));
+      const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+      expect(hardRides.length).toBeGreaterThan(0);
+    });
+
+    it("downgrades all hard cycling to non-hard when ramp exceeds threshold", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad, rampRatePct: 9.5 }));
+      const cycling = result.filter((w) => w.type === "cycling");
+      expect(cycling.length).toBeGreaterThan(0);
+      for (const ride of cycling) {
+        expect(ride.intensity).not.toBe("hard");
+      }
+    });
+
+    it("still places weight + low-cadence sessions when guard fires", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad, rampRatePct: 9.5 }));
+      // Guard only affects cycling intensity, not strength/low-cadence cadence.
+      expect(result.filter((w) => w.type === "low_cadence")).toHaveLength(1);
+      expect(result.filter((w) => w.type === "weights")).toHaveLength(2);
+    });
+  });
+
+  describe("rampGuardTriggered", () => {
+    it("returns false for undefined or below-threshold values", () => {
+      expect(rampGuardTriggered(undefined, BASE_CONFIG)).toBe(false);
+      expect(rampGuardTriggered(0, BASE_CONFIG)).toBe(false);
+      expect(rampGuardTriggered(7, BASE_CONFIG)).toBe(false);
+    });
+    it("returns true when ramp exceeds threshold", () => {
+      expect(rampGuardTriggered(7.1, BASE_CONFIG)).toBe(true);
+      expect(rampGuardTriggered(15, BASE_CONFIG)).toBe(true);
+    });
+  });
+
   describe("classifyFatigue", () => {
     const cfg = BASE_CONFIG;
     it("returns very_fatigued below tsb_very_fatigued", () => {
@@ -329,6 +375,57 @@ describe("schedule", () => {
     });
     it("returns fresh above tsb_fresh", () => {
       expect(classifyFatigue(10, cfg)).toBe("fresh");
+    });
+  });
+
+  describe("zone-aware hard-day placement", () => {
+    const freshLoad = { ctl: 50, atl: 40, tsb: 10 };
+
+    it("attaches a targetZone to every hard cycling ride when distribution is given", () => {
+      // Distribution shows endurance over-represented, hard zones empty —
+      // every hard cycling target should pick a hard zone.
+      const dist = { ...emptyDistribution(), endurance: 1.0 };
+      const result = schedule(makeInput({ trainingLoad: freshLoad, zoneDistribution: dist }));
+      const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+      expect(hardRides.length).toBeGreaterThan(0);
+      for (const ride of hardRides) {
+        expect(ride.targetZone).toBeDefined();
+        expect(["sweet_spot", "threshold", "vo2", "anaerobic"]).toContain(ride.targetZone);
+      }
+    });
+
+    it("does not assign duplicate zones across multiple hard rides", () => {
+      const dist = { ...emptyDistribution(), endurance: 1.0 };
+      const result = schedule(makeInput({ trainingLoad: freshLoad, zoneDistribution: dist }));
+      const zones = result
+        .filter((w) => w.type === "cycling" && w.intensity === "hard")
+        .map((w) => w.targetZone);
+      // Cardinal: at least 2 hard rides with distinct zones when fresh
+      expect(zones.length).toBeGreaterThanOrEqual(2);
+      expect(new Set(zones).size).toBe(zones.length);
+    });
+
+    it("omits targetZone when no distribution is supplied (back-compat)", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad }));
+      const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+      for (const ride of hardRides) {
+        expect(ride.targetZone).toBeUndefined();
+      }
+    });
+
+    it("does not attach a targetZone to easy or moderate rides", () => {
+      const dist = { ...emptyDistribution(), endurance: 1.0 };
+      const result = schedule(
+        makeInput({
+          trainingLoad: { ctl: 50, atl: 70, tsb: -15 }, // fatigued → easy
+          zoneDistribution: dist,
+        }),
+      );
+      const cycling = result.filter((w) => w.type === "cycling");
+      expect(cycling.length).toBeGreaterThan(0);
+      for (const ride of cycling) {
+        expect(ride.targetZone).toBeUndefined();
+      }
     });
   });
 

@@ -32,13 +32,17 @@ Workout definitions and scheduling rules live in `config.yaml`:
 - `scheduling.tsb_fatigued` — TSB below this is considered "fatigued" (default `-10`).
 - `scheduling.weight_sessions` — weight sessions per week (default `2`).
 - `scheduling.min_weight_gap_days` — minimum days between weight sessions (default `2`).
+- `scheduling.max_weekly_ramp_pct` — CTL ramp above this triggers an easy-bias
+  guard (default `7`).
 
 ## Commands
 
 ```sh
-npm run status             # show current CTL/ATL/TSB and Xert metrics
-npm run plan -- --dry-run  # print the week's plan without pushing
-npm run plan               # generate and push the plan to Intervals.icu
+npm run check                     # smoke-test Intervals.icu + Xert credentials
+npm run status                    # show current CTL/ATL/TSB and Xert metrics
+npm run status -- --json          # same data as JSON, including zone mix and ramp
+npm run plan -- --dry-run         # print the week's plan without pushing
+npm run plan                      # generate and push the plan to Intervals.icu
 ```
 
 The `plan` command fetches existing Intervals.icu events for the next 7 days
@@ -59,6 +63,20 @@ For each 7-day window, starting from today:
 
 Weight and low-cadence days are always classified as "hard" for the
 back-to-back constraint.
+
+### Zone targeting
+
+Each hard cycling day is tagged with a target power zone — sweet spot,
+threshold, VO2, or anaerobic — chosen to fill the largest gap between the
+last 28 days of TSS-weighted zone distribution and a hardcoded baseline.
+Two hard rides in a week are guaranteed to target different zones.
+
+### Ramp guard
+
+If the trailing 7-day CTL ramp exceeds `max_weekly_ramp_pct`, hard cycling
+targets are dropped and remaining hard fills are downgraded — the same
+philosophy as the TSB-driven downgrade, just driven by CTL ramp rate. The
+`plan` output prints a warning when this fires.
 
 ## Development
 

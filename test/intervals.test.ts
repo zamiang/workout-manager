@@ -89,6 +89,90 @@ describe("IntervalsClient", () => {
     });
   });
 
+  describe("getTrainingLoadRange", () => {
+    it("returns parsed wellness entries with dates from the `id` field", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { id: "2026-04-19", ctl: 55, atl: 60, tsb: -5 },
+          { id: "2026-04-20", ctl: 56, atl: 62, tsb: -6 },
+        ],
+      });
+
+      const range = await client.getTrainingLoadRange("2026-04-19", "2026-04-20");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://intervals.icu/api/v1/athlete/0/wellness?oldest=2026-04-19&newest=2026-04-20",
+        expect.any(Object),
+      );
+      expect(range).toEqual([
+        { date: "2026-04-19", ctl: 55, atl: 60, tsb: -5 },
+        { date: "2026-04-20", ctl: 56, atl: 62, tsb: -6 },
+      ]);
+    });
+
+    it("returns empty array when the response is not an array", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => null,
+      });
+      const range = await client.getTrainingLoadRange("2026-04-19", "2026-04-20");
+      expect(range).toEqual([]);
+    });
+  });
+
+  describe("getActivities", () => {
+    it("fetches activities and normalizes the fields we care about", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            id: "i12345",
+            start_date_local: "2026-04-19T08:00:00",
+            type: "Ride",
+            icu_training_load: 78,
+            icu_intensity: 0.82,
+            icu_zone_times: [600, 1200, 1800, 600, 0, 0, 0],
+          },
+          {
+            id: "i12346",
+            start_date_local: "2026-04-20T07:30:00",
+            type: "Run",
+            icu_training_load: 45,
+            // missing icu_intensity / icu_zone_times — should null out
+          },
+        ],
+      });
+
+      const activities = await client.getActivities("2026-04-19", "2026-04-20");
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://intervals.icu/api/v1/athlete/0/activities?oldest=2026-04-19&newest=2026-04-20",
+        expect.any(Object),
+      );
+      expect(activities).toHaveLength(2);
+      expect(activities[0]).toEqual({
+        id: "i12345",
+        start_date_local: "2026-04-19T08:00:00",
+        type: "Ride",
+        icu_training_load: 78,
+        icu_intensity: 0.82,
+        icu_zone_times: [600, 1200, 1800, 600, 0, 0, 0],
+      });
+      expect(activities[1].icu_intensity).toBeNull();
+      expect(activities[1].icu_zone_times).toBeNull();
+    });
+
+    it("returns empty array when response is not an array", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      });
+      const activities = await client.getActivities("2026-04-19", "2026-04-20");
+      expect(activities).toEqual([]);
+    });
+  });
+
   describe("createEvent", () => {
     it("posts an event to the calendar", async () => {
       const event: IntervalsEvent = {

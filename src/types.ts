@@ -1,3 +1,5 @@
+import type { Zone } from "./zones.js";
+
 // --- Config ---
 
 export interface WorkoutDefinition {
@@ -13,6 +15,7 @@ export interface SchedulingConfig {
   weight_sessions: number; // default 2
   weight_sessions_very_fatigued: number; // default 1 — weight sessions when TSB < tsb_very_fatigued
   min_weight_gap_days: number; // default 2
+  max_weekly_ramp_pct: number; // default 7 — CTL ramp above this triggers an easy-bias guard
 }
 
 export interface Config {
@@ -36,6 +39,19 @@ export interface TrainingLoad {
   ctl: number; // chronic training load (fitness)
   atl: number; // acute training load (fatigue)
   tsb: number; // training stress balance (form)
+}
+
+export interface WellnessEntry extends TrainingLoad {
+  date: string; // YYYY-MM-DD (from the wellness `id` field)
+}
+
+export interface Activity {
+  id: string;
+  start_date_local: string; // ISO timestamp from the API; we don't trim it
+  type: string; // "Ride", "VirtualRide", "Run", etc.
+  icu_training_load: number; // TSS
+  icu_intensity: number | null; // IF, when available (null for non-power activities)
+  icu_zone_times: number[] | null; // seconds in each power zone, when available
 }
 
 // --- Xert ---
@@ -63,6 +79,7 @@ export interface PlannedWorkout {
   name: string;
   description: string;
   intensity: CyclingIntensity | "hard"; // weights and low_cadence are always "hard"
+  targetZone?: Zone; // set on hard cycling days when zone distribution is supplied
 }
 
 export interface SchedulerInput {
@@ -71,4 +88,6 @@ export interface SchedulerInput {
   trainingLoad: TrainingLoad;
   xertInfo: XertTrainingInfo;
   config: Config;
+  zoneDistribution?: Record<Zone, number>; // trailing TSS-weighted zone mix
+  rampRatePct?: number; // trailing-week CTL ramp; triggers guard above threshold
 }

@@ -1,21 +1,31 @@
 import { describe, it, expect } from "vitest";
-import { parseArgs, formatPlan, workoutToEvent } from "../src/cli.js";
-import type { PlannedWorkout } from "../src/types.js";
+import { parseArgs, formatPlan, workoutToEvent, computeWeeklyRampPct } from "../src/cli.js";
+import type { PlannedWorkout, WellnessEntry } from "../src/types.js";
 
 describe("parseArgs", () => {
   it("parses 'plan' command", () => {
     const result = parseArgs(["plan"]);
-    expect(result).toEqual({ command: "plan", dryRun: false });
+    expect(result).toEqual({ command: "plan", dryRun: false, json: false });
   });
 
   it("parses 'plan --dry-run' command", () => {
     const result = parseArgs(["plan", "--dry-run"]);
-    expect(result).toEqual({ command: "plan", dryRun: true });
+    expect(result).toEqual({ command: "plan", dryRun: true, json: false });
   });
 
   it("parses 'status' command", () => {
     const result = parseArgs(["status"]);
-    expect(result).toEqual({ command: "status", dryRun: false });
+    expect(result).toEqual({ command: "status", dryRun: false, json: false });
+  });
+
+  it("parses 'status --json' command", () => {
+    const result = parseArgs(["status", "--json"]);
+    expect(result).toEqual({ command: "status", dryRun: false, json: true });
+  });
+
+  it("parses 'check' command", () => {
+    const result = parseArgs(["check"]);
+    expect(result).toEqual({ command: "check", dryRun: false, json: false });
   });
 
   it("throws on unknown command", () => {
@@ -84,6 +94,29 @@ describe("formatPlan", () => {
 
   it("returns an empty string for an empty plan", () => {
     expect(formatPlan([])).toBe("");
+  });
+});
+
+describe("computeWeeklyRampPct", () => {
+  function w(date: string, ctl: number): WellnessEntry {
+    return { date, ctl, atl: 0, tsb: 0 };
+  }
+
+  it("returns undefined for an empty range", () => {
+    expect(computeWeeklyRampPct([])).toBeUndefined();
+  });
+
+  it("returns undefined when the oldest CTL is zero", () => {
+    expect(computeWeeklyRampPct([w("2026-04-19", 0), w("2026-04-26", 50)])).toBeUndefined();
+  });
+
+  it("computes ramp as (newest - oldest) / oldest * 100", () => {
+    expect(computeWeeklyRampPct([w("2026-04-19", 50), w("2026-04-26", 53.5)])).toBeCloseTo(7, 5);
+    expect(computeWeeklyRampPct([w("2026-04-19", 50), w("2026-04-26", 55)])).toBeCloseTo(10, 5);
+  });
+
+  it("handles entries arriving in any date order", () => {
+    expect(computeWeeklyRampPct([w("2026-04-26", 55), w("2026-04-19", 50)])).toBeCloseTo(10, 5);
   });
 });
 

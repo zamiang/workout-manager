@@ -6,6 +6,7 @@ import type {
   Config,
   XertTrainingInfo,
 } from "./types.js";
+import { mostDeficientZone, zoneLabel, type Zone } from "./zones.js";
 
 function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr + "T00:00:00");
@@ -28,21 +29,31 @@ function classifyIntensity(fatigue: FatigueLevel): CyclingIntensity {
   return "moderate";
 }
 
+export function rampGuardTriggered(rampRatePct: number | undefined, config: Config): boolean {
+  if (rampRatePct === undefined) return false;
+  return rampRatePct > config.scheduling.max_weekly_ramp_pct;
+}
+
 function isHard(type: WorkoutType, intensity: CyclingIntensity | "hard"): boolean {
   if (type === "weights" || type === "low_cadence") return true;
   return intensity === "hard";
 }
 
-function buildCyclingDescription(intensity: CyclingIntensity, xert: XertTrainingInfo): string {
+function buildCyclingDescription(
+  intensity: CyclingIntensity,
+  xert: XertTrainingInfo,
+  targetZone?: Zone,
+): string {
+  const zoneSuffix = targetZone ? ` — target zone: ${zoneLabel(targetZone)}` : "";
   switch (intensity) {
     case "easy":
       return "Easy ride — Zone 2 recovery spin";
     case "moderate":
-      return `Moderate ride — Xert focus: ${xert.focus}`;
+      return `Moderate ride — Xert focus: ${xert.focus}${zoneSuffix}`;
     case "hard":
       return xert.wotd_name
-        ? `${xert.wotd_name} — ${xert.wotd_description ?? xert.focus}`
-        : `Hard ride — Xert focus: ${xert.focus}`;
+        ? `${xert.wotd_name} — ${xert.wotd_description ?? xert.focus}${zoneSuffix}`
+        : `Hard ride — Xert focus: ${xert.focus}${zoneSuffix}`;
   }
 }
 
@@ -59,9 +70,28 @@ function buildCyclingDescription(intensity: CyclingIntensity, xert: XertTraining
 //   - very_fatigued:  day 0 reserved for rest; low-cadence dropped; a single
 //                     strength session placed mid-week
 export function schedule(input: SchedulerInput): PlannedWorkout[] {
-  const { startDate, existingEvents, trainingLoad, xertInfo, config } = input;
+  const {
+    startDate,
+    existingEvents,
+    trainingLoad,
+    xertInfo,
+    config,
+    zoneDistribution,
+    rampRatePct,
+  } = input;
   const days = 7;
   const { scheduling, weight_training, low_cadence } = config;
+  const guardOn = rampGuardTriggered(rampRatePct, config);
+
+  // Track zones already assigned to hard rides this week so consecutive hard
+  // days target different zones (highest deficit first, then second-highest).
+  const usedHardZones = new Set<Zone>();
+  const pickHardZone = (): Zone | undefined => {
+    if (!zoneDistribution) return undefined;
+    const z = mostDeficientZone(zoneDistribution, undefined, usedHardZones);
+    usedHardZones.add(z);
+    return z;
+  };
 
   const lockedDates = new Set(existingEvents.map((e) => e.start_date_local));
   const dates: string[] = [];
@@ -69,7 +99,12 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const available = dates.map((d, i) => (lockedDates.has(d) ? -1 : i)).filter((i) => i >= 0);
 
   const fatigue = classifyFatigue(trainingLoad.tsb, config);
-  const intensity = classifyIntensity(fatigue);
+  // When the ramp guard fires, treat the week as moderate at best — drops
+  // hard cycling targets entirely and downgrades hard fills to easy. Same
+  // philosophy as the TSB-driven downgrade, just driven by CTL ramp.
+  const baseIntensity = classifyIntensity(fatigue);
+  const intensity: CyclingIntensity =
+    guardOn && baseIntensity === "hard" ? "moderate" : baseIntensity;
   const veryFatigued = fatigue === "very_fatigued";
   const weightSessionsTarget = veryFatigued
     ? scheduling.weight_sessions_very_fatigued
@@ -131,12 +166,14 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
       );
       if (!respectsWeightGap(i, existingHardSpots)) continue;
       hardCyclingTargets.add(i);
+      const targetZone = pickHardZone();
       plan[i].push({
         date: dates[i],
         type: "cycling",
         name: xertInfo.wotd_name ?? "Hard Ride",
-        description: buildCyclingDescription("hard", xertInfo),
+        description: buildCyclingDescription("hard", xertInfo, targetZone),
         intensity: "hard",
+        ...(targetZone ? { targetZone } : {}),
       });
     }
   }
@@ -208,6 +245,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     if (rideIntensity === "hard" && wouldCreateBackToBack(i)) {
       rideIntensity = "easy";
     }
+    const targetZone = rideIntensity === "hard" ? pickHardZone() : undefined;
     plan[i].push({
       date: dates[i],
       type: "cycling",
@@ -217,8 +255,9 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
           : rideIntensity === "moderate"
             ? "Moderate Ride"
             : (xertInfo.wotd_name ?? "Hard Ride"),
-      description: buildCyclingDescription(rideIntensity, xertInfo),
+      description: buildCyclingDescription(rideIntensity, xertInfo, targetZone),
       intensity: rideIntensity,
+      ...(targetZone ? { targetZone } : {}),
     });
   }
 

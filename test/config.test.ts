@@ -70,6 +70,28 @@ low_cadence:
     expect(config.scheduling.weight_sessions).toBe(2);
     expect(config.scheduling.weight_sessions_very_fatigued).toBe(1);
     expect(config.scheduling.min_weight_gap_days).toBe(2);
+    expect(config.scheduling.max_weekly_ramp_pct).toBe(7);
+  });
+
+  it("accepts a max_weekly_ramp_pct override", async () => {
+    const yaml = `
+weight_training:
+  name: "Strength"
+  duration_minutes: 60
+  description: "test"
+
+low_cadence:
+  name: "LC"
+  duration_minutes: 60
+  description: "test"
+
+scheduling:
+  max_weekly_ramp_pct: 5
+`;
+    const file = path.join(tmpDir, "config.yaml");
+    await fs.writeFile(file, yaml, "utf8");
+    const config = await loadConfig(file);
+    expect(config.scheduling.max_weekly_ramp_pct).toBe(5);
   });
 
   it("throws if weight_training is missing", async () => {
