@@ -38,6 +38,19 @@ export interface TrainingLoad {
   tsb: number; // training stress balance (form)
 }
 
+export interface WellnessEntry extends TrainingLoad {
+  date: string; // YYYY-MM-DD (from the wellness `id` field)
+}
+
+export interface Activity {
+  id: string;
+  start_date_local: string; // ISO timestamp from the API; we don't trim it
+  type: string; // "Ride", "VirtualRide", "Run", etc.
+  icu_training_load: number; // TSS
+  icu_intensity: number | null; // IF, when available (null for non-power activities)
+  icu_zone_times: number[] | null; // seconds in each power zone, when available
+}
+
 // --- Xert ---
 
 export interface XertTrainingInfo {
