@@ -5,17 +5,27 @@ import type { PlannedWorkout, WellnessEntry } from "../src/types.js";
 describe("parseArgs", () => {
   it("parses 'plan' command", () => {
     const result = parseArgs(["plan"]);
-    expect(result).toEqual({ command: "plan", dryRun: false });
+    expect(result).toEqual({ command: "plan", dryRun: false, json: false });
   });
 
   it("parses 'plan --dry-run' command", () => {
     const result = parseArgs(["plan", "--dry-run"]);
-    expect(result).toEqual({ command: "plan", dryRun: true });
+    expect(result).toEqual({ command: "plan", dryRun: true, json: false });
   });
 
   it("parses 'status' command", () => {
     const result = parseArgs(["status"]);
-    expect(result).toEqual({ command: "status", dryRun: false });
+    expect(result).toEqual({ command: "status", dryRun: false, json: false });
+  });
+
+  it("parses 'status --json' command", () => {
+    const result = parseArgs(["status", "--json"]);
+    expect(result).toEqual({ command: "status", dryRun: false, json: true });
+  });
+
+  it("parses 'check' command", () => {
+    const result = parseArgs(["check"]);
+    expect(result).toEqual({ command: "check", dryRun: false, json: false });
   });
 
   it("throws on unknown command", () => {
