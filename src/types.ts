@@ -15,6 +15,7 @@ export interface SchedulingConfig {
   weight_sessions: number; // default 2
   weight_sessions_very_fatigued: number; // default 1 — weight sessions when TSB < tsb_very_fatigued
   min_weight_gap_days: number; // default 2
+  max_weekly_ramp_pct: number; // default 7 — CTL ramp above this triggers an easy-bias guard
 }
 
 export interface Config {
@@ -88,4 +89,5 @@ export interface SchedulerInput {
   xertInfo: XertTrainingInfo;
   config: Config;
   zoneDistribution?: Record<Zone, number>; // trailing TSS-weighted zone mix
+  rampRatePct?: number; // trailing-week CTL ramp; triggers guard above threshold
 }

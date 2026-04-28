@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { schedule, classifyFatigue } from "../src/scheduler.js";
+import { schedule, classifyFatigue, rampGuardTriggered } from "../src/scheduler.js";
 import { emptyDistribution } from "../src/zones.js";
 import type { SchedulerInput, IntervalsEvent, Config, PlannedWorkout } from "../src/types.js";
 
@@ -25,6 +25,7 @@ const BASE_CONFIG: Config = {
     weight_sessions: 2,
     weight_sessions_very_fatigued: 1,
     min_weight_gap_days: 2,
+    max_weekly_ramp_pct: 7,
   },
 };
 
@@ -314,6 +315,50 @@ describe("schedule", () => {
       );
       expect(result.find((w) => w.date === "2026-04-20")).toBeUndefined();
       expect(result.filter((w) => w.type === "weights")).toHaveLength(1);
+    });
+  });
+
+  describe("ramp guard", () => {
+    const freshLoad = { ctl: 50, atl: 40, tsb: 10 };
+
+    it("does not fire when rampRatePct is undefined", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad }));
+      const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+      expect(hardRides.length).toBeGreaterThan(0);
+    });
+
+    it("does not fire when rampRatePct is at or below threshold", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad, rampRatePct: 7 }));
+      const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+      expect(hardRides.length).toBeGreaterThan(0);
+    });
+
+    it("downgrades all hard cycling to non-hard when ramp exceeds threshold", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad, rampRatePct: 9.5 }));
+      const cycling = result.filter((w) => w.type === "cycling");
+      expect(cycling.length).toBeGreaterThan(0);
+      for (const ride of cycling) {
+        expect(ride.intensity).not.toBe("hard");
+      }
+    });
+
+    it("still places weight + low-cadence sessions when guard fires", () => {
+      const result = schedule(makeInput({ trainingLoad: freshLoad, rampRatePct: 9.5 }));
+      // Guard only affects cycling intensity, not strength/low-cadence cadence.
+      expect(result.filter((w) => w.type === "low_cadence")).toHaveLength(1);
+      expect(result.filter((w) => w.type === "weights")).toHaveLength(2);
+    });
+  });
+
+  describe("rampGuardTriggered", () => {
+    it("returns false for undefined or below-threshold values", () => {
+      expect(rampGuardTriggered(undefined, BASE_CONFIG)).toBe(false);
+      expect(rampGuardTriggered(0, BASE_CONFIG)).toBe(false);
+      expect(rampGuardTriggered(7, BASE_CONFIG)).toBe(false);
+    });
+    it("returns true when ramp exceeds threshold", () => {
+      expect(rampGuardTriggered(7.1, BASE_CONFIG)).toBe(true);
+      expect(rampGuardTriggered(15, BASE_CONFIG)).toBe(true);
     });
   });
 

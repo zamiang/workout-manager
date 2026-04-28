@@ -61,3 +61,4 @@ scheduling:
   weight_sessions: 2
   weight_sessions_very_fatigued: 1
   min_weight_gap_days: 2
+  max_weekly_ramp_pct: 7

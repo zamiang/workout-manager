@@ -3,9 +3,20 @@ loadEnv({ quiet: true });
 import { loadConfig } from "./config.js";
 import { IntervalsClient } from "./intervals.js";
 import { XertClient } from "./xert.js";
-import { schedule, classifyFatigue } from "./scheduler.js";
+import { schedule, classifyFatigue, rampGuardTriggered } from "./scheduler.js";
 import { computeDistribution, zoneLabel } from "./zones.js";
-import type { PlannedWorkout, IntervalsEvent, WorkoutType } from "./types.js";
+import type { PlannedWorkout, IntervalsEvent, WellnessEntry, WorkoutType } from "./types.js";
+
+// CTL ramp = (today - 7d ago) / (7d ago) * 100. Returns undefined when the
+// 7-day-ago wellness entry is missing or zero (new athlete, gap in syncing).
+export function computeWeeklyRampPct(range: WellnessEntry[]): number | undefined {
+  if (range.length === 0) return undefined;
+  const sorted = [...range].sort((a, b) => a.date.localeCompare(b.date));
+  const oldest = sorted[0];
+  const newest = sorted[sorted.length - 1];
+  if (oldest.ctl <= 0) return undefined;
+  return ((newest.ctl - oldest.ctl) / oldest.ctl) * 100;
+}
 
 interface ParsedArgs {
   command: "plan" | "status";
@@ -114,15 +125,20 @@ async function main() {
   const lookbackStart = new Date();
   lookbackStart.setDate(lookbackStart.getDate() - 28);
   const lookbackStr = lookbackStart.toISOString().slice(0, 10);
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
 
-  const [events, load, info, activities] = await Promise.all([
+  const [events, load, info, activities, wellnessRange] = await Promise.all([
     intervals.getEvents(today, endStr),
     intervals.getTrainingLoad(today),
     xert.getTrainingInfo(),
     intervals.getActivities(lookbackStr, today),
+    intervals.getTrainingLoadRange(weekAgoStr, today),
   ]);
 
   const zoneDistribution = computeDistribution(activities);
+  const rampRatePct = computeWeeklyRampPct(wellnessRange);
 
   const planned = schedule({
     startDate: today,
@@ -131,6 +147,7 @@ async function main() {
     xertInfo: info,
     config,
     zoneDistribution,
+    rampRatePct,
   });
 
   const fatigue = classifyFatigue(load.tsb, config);
@@ -145,6 +162,11 @@ async function main() {
   console.log(
     `TSB ${load.tsb.toFixed(1)} (${fatigueLabel[fatigue] ?? fatigue}) — Xert: ${info.training_status || "n/a"}`,
   );
+  if (rampGuardTriggered(rampRatePct, config) && rampRatePct !== undefined) {
+    console.log(
+      `WARNING: CTL ramp +${rampRatePct.toFixed(1)}%/wk > ${config.scheduling.max_weekly_ramp_pct}% threshold — hard rides downgraded`,
+    );
+  }
   console.log();
   console.log(formatPlan(planned));
   console.log();
