@@ -318,6 +318,60 @@ describe("schedule", () => {
     });
   });
 
+  describe("completed-activity awareness", () => {
+    it("locks dates that already have a completed activity (not just calendar events)", () => {
+      // Already trained today (e.g. a ride logged as an activity, not a planned
+      // calendar event). The scheduler must not pile another session on it.
+      const result = schedule(makeInput({ completedDates: ["2026-04-20"] }));
+      expect(result.find((w) => w.date === "2026-04-20")).toBeUndefined();
+    });
+
+    it("locks completed dates in addition to existing calendar events", () => {
+      const existing: IntervalsEvent[] = [
+        {
+          id: 1,
+          start_date_local: "2026-04-21",
+          name: "Group Ride",
+          category: "WORKOUT",
+          type: "Ride",
+        },
+      ];
+      const result = schedule(
+        makeInput({ existingEvents: existing, completedDates: ["2026-04-20"] }),
+      );
+      expect(result.find((w) => w.date === "2026-04-20")).toBeUndefined();
+      expect(result.find((w) => w.date === "2026-04-21")).toBeUndefined();
+    });
+  });
+
+  describe("no hard stacking on recovery weeks", () => {
+    const fatiguedLoad = { ctl: 50, atl: 70, tsb: -15 };
+
+    it("does not co-locate weights on the low-cadence day when fatigued", () => {
+      const result = schedule(makeInput({ trainingLoad: fatiguedLoad }));
+      const lcDate = result.find((w) => w.type === "low_cadence")?.date;
+      expect(lcDate).toBeDefined();
+      const sameDay = result.filter((w) => w.date === lcDate);
+      expect(sameDay.some((w) => w.type === "weights")).toBe(false);
+    });
+
+    it("never places two hard sessions on the same day when fatigued", () => {
+      const result = schedule(makeInput({ trainingLoad: fatiguedLoad }));
+      const byDate = new Map<string, number>();
+      for (const w of result) {
+        if (isHardEntry(w)) byDate.set(w.date, (byDate.get(w.date) ?? 0) + 1);
+      }
+      for (const [, count] of byDate) {
+        expect(count).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it("still places both weight sessions when fatigued", () => {
+      const result = schedule(makeInput({ trainingLoad: fatiguedLoad }));
+      expect(result.filter((w) => w.type === "weights")).toHaveLength(2);
+    });
+  });
+
   describe("ramp guard", () => {
     const freshLoad = { ctl: 50, atl: 40, tsb: 10 };
 

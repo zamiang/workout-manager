@@ -130,12 +130,24 @@ describe("workoutToEvent", () => {
       intensity: "hard",
     });
     expect(event).toEqual({
-      start_date_local: "2026-04-20",
+      // Intervals.icu rejects a bare date with a 422 — it needs a time component.
+      start_date_local: "2026-04-20T00:00:00",
       name: "Hard Ride",
       category: "WORKOUT",
       type: "Ride",
       description: "threshold",
     });
+  });
+
+  it("appends a midnight time component so Intervals.icu accepts the date", () => {
+    const event = workoutToEvent({
+      date: "2026-04-22",
+      type: "weights",
+      name: "Strength",
+      description: "",
+      intensity: "hard",
+    });
+    expect(event.start_date_local).toBe("2026-04-22T00:00:00");
   });
 
   it("maps low_cadence to a Ride workout", () => {

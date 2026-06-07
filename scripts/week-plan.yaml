@@ -1,0 +1,43 @@
+# Editable weekly plan for scripts/push-week.ts.
+#
+# Each session has a `day` (Mon..Sun, or a 0-6 offset from the anchor Monday)
+# and either:
+#   - `workout: low_cadence` / `workout: weight_training`
+#       -> pulls name + description straight from config.yaml, or
+#   - an explicit `name`, `type` (Ride | WeightTraining | ...), `description`.
+#
+# By default the week is anchored to the upcoming Monday. Override with
+#   npm run push-week -- --start 2026-06-08
+# Preview without writing to Intervals.icu with --dry-run. Days that already
+# have a calendar event are skipped so re-running never duplicates.
+
+sessions:
+  - day: Tue
+    workout: low_cadence
+
+  - day: Wed
+    name: Easy Z2 Ride
+    type: Ride
+    description: >
+      Easy Zone 2 endurance ride, 45-60 min. Conversational power/HR.
+      Flush the legs.
+
+  - day: Thu
+    workout: weight_training
+
+  - day: Fri
+    name: Easy Z2 Ride
+    type: Ride
+    description: >
+      Easy Zone 2 endurance ride, 45-60 min. Optional — swap to rest if
+      HRV is still depressed.
+
+  - day: Sat
+    name: Endurance Z2 Ride
+    type: Ride
+    description: >
+      Longer easy Zone 2 ride, ~90 min. The biggest aerobic touch of the
+      week — strictly aerobic, no surges.
+
+  - day: Sun
+    workout: weight_training

@@ -79,7 +79,9 @@ const WORKOUT_TYPE_TO_EVENT_TYPE: Record<WorkoutType, string> = {
 
 export function workoutToEvent(w: PlannedWorkout): IntervalsEvent {
   return {
-    start_date_local: w.date,
+    // Intervals.icu's event API rejects a bare YYYY-MM-DD with a 422
+    // ("could not be parsed at index 10") — it needs a time component.
+    start_date_local: `${w.date}T00:00:00`,
     name: w.name,
     category: w.type === "rest" ? "NOTE" : "WORKOUT",
     type: WORKOUT_TYPE_TO_EVENT_TYPE[w.type],
@@ -201,6 +203,15 @@ async function main() {
 
   const zoneDistribution = computeDistribution(activities);
   const rampRatePct = computeWeeklyRampPct(wellnessRange);
+  // Activities already logged inside the planning window (typically today) lock
+  // their day so the planner doesn't schedule on top of a completed session.
+  const completedDates = [
+    ...new Set(
+      activities
+        .map((a) => a.start_date_local.slice(0, 10))
+        .filter((d) => d >= today && d <= endStr),
+    ),
+  ];
 
   const planned = schedule({
     startDate: today,
@@ -210,6 +221,7 @@ async function main() {
     config,
     zoneDistribution,
     rampRatePct,
+    completedDates,
   });
 
   const fatigue = classifyFatigue(load.tsb, config);

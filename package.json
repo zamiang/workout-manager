@@ -8,6 +8,8 @@
     "plan": "tsx src/cli.ts plan",
     "status": "tsx src/cli.ts status",
     "check": "tsx src/cli.ts check",
+    "push-week": "tsx scripts/push-week.ts",
+    "events": "tsx scripts/events.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

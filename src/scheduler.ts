@@ -78,6 +78,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     config,
     zoneDistribution,
     rampRatePct,
+    completedDates,
   } = input;
   const days = 7;
   const { scheduling, weight_training, low_cadence } = config;
@@ -93,7 +94,13 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     return z;
   };
 
-  const lockedDates = new Set(existingEvents.map((e) => e.start_date_local));
+  // Lock days that already have a planned calendar event OR a completed
+  // activity — the planner only fills genuinely empty days, so a session
+  // already logged today shouldn't get a duplicate piled on top of it.
+  const lockedDates = new Set([
+    ...existingEvents.map((e) => e.start_date_local),
+    ...(completedDates ?? []),
+  ]);
   const dates: string[] = [];
   for (let i = 0; i < days; i++) dates.push(addDays(startDate, i));
   const available = dates.map((d, i) => (lockedDates.has(d) ? -1 : i)).filter((i) => i >= 0);
@@ -106,6 +113,11 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const intensity: CyclingIntensity =
     guardOn && baseIntensity === "hard" ? "moderate" : baseIntensity;
   const veryFatigued = fatigue === "very_fatigued";
+  // Polarized stacking — co-locating weights onto a hard day — only makes sense
+  // when there's capacity to absorb a concentrated stress day. On recovery
+  // weeks (fatigued or worse) it just piles two hard sessions together and
+  // defeats the recovery intent, so weights get their own spaced-out days.
+  const stackWeightsOnHardDays = fatigue === "fresh" || fatigue === "moderate";
   const weightSessionsTarget = veryFatigued
     ? scheduling.weight_sessions_very_fatigued
     : scheduling.weight_sessions;
@@ -180,10 +192,12 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
 
   // Phase 3: place weights, co-locating with hard days first, then overflowing.
   const weightSlots: number[] = [];
-  const hardStackOrder = [
-    ...(lcIdx !== undefined ? [lcIdx] : []),
-    ...[...hardCyclingTargets].sort((a, b) => a - b),
-  ].sort((a, b) => a - b);
+  const hardStackOrder = stackWeightsOnHardDays
+    ? [
+        ...(lcIdx !== undefined ? [lcIdx] : []),
+        ...[...hardCyclingTargets].sort((a, b) => a - b),
+      ].sort((a, b) => a - b)
+    : [];
   for (const i of hardStackOrder) {
     if (weightSlots.length >= weightSessionsTarget) break;
     if (!respectsWeightGap(i, weightSlots)) continue;

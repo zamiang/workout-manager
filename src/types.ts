@@ -90,4 +90,5 @@ export interface SchedulerInput {
   config: Config;
   zoneDistribution?: Record<Zone, number>; // trailing TSS-weighted zone mix
   rampRatePct?: number; // trailing-week CTL ramp; triggers guard above threshold
+  completedDates?: string[]; // YYYY-MM-DD dates that already have a logged activity; locked like existing events
 }
