@@ -46,7 +46,28 @@ npm run plan                      # generate and push the plan to Intervals.icu
 ```
 
 The `plan` command fetches existing Intervals.icu events for the next 7 days
-and leaves those dates untouched; only empty days are filled.
+and leaves those dates untouched; only empty days are filled. It also locks any
+day that already has a **completed activity** (e.g. a ride you logged today), so
+it never schedules on top of a session you've already done.
+
+### Hand-tuned weeks
+
+When the generated plan isn't quite what you want, edit `scripts/week-plan.yaml`
+and push it directly:
+
+```sh
+npm run push-week -- --dry-run               # preview, write nothing
+npm run push-week                            # push scripts/week-plan.yaml
+npm run push-week -- --start 2026-06-08      # anchor to a specific Monday
+npm run push-week -- --file other-plan.yaml  # use a different plan file
+npm run events                               # list calendar events (next 7 days)
+npm run events -- 2026-06-08 2026-06-14      # …for an explicit date range
+```
+
+The plan file anchors to the upcoming Monday by default; each session names a
+`day` plus either a `workout:` (pulled from `config.yaml`) or an explicit
+`name`/`type`/`description`. Days that already hold an event are skipped, so
+re-running never duplicates.
 
 ## How the schedule is built
 
@@ -63,6 +84,11 @@ For each 7-day window, starting from today:
 
 Weight and low-cadence days are always classified as "hard" for the
 back-to-back constraint.
+
+On **fresh** or **moderate** weeks, weight sessions are co-located onto hard
+days (polarized stacking) to keep full-recovery days open. On **fatigued** or
+**very fatigued** weeks this is disabled — stacking two hard sessions on one day
+defeats the recovery intent — so weights get their own spaced-out days instead.
 
 ### Zone targeting
 
