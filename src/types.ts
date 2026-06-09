@@ -33,6 +33,11 @@ export interface IntervalsEvent {
   category: string; // "WORKOUT", "NOTE", etc.
   description?: string;
   type?: string; // "Ride", "WeightTraining", etc.
+  // Planned-load targets. When set, Intervals.icu shows the workout's target
+  // TSS/duration/IF on the calendar and folds it into the planned CTL/ATL curve.
+  icu_training_load?: number; // planned TSS
+  moving_time?: number; // planned duration, seconds
+  icu_intensity?: number; // planned intensity factor (IF), e.g. 0.75
 }
 
 export interface TrainingLoad {
