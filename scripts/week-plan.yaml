@@ -2,7 +2,7 @@
 #
 # Each session has a `day` (Mon..Sun, or a 0-6 offset from the anchor Monday)
 # and either:
-#   - `workout: low_cadence` / `workout: weight_training`
+#   - `workout: sweet_spot` / `workout: weight_training`
 #       -> pulls name + description straight from config.yaml, or
 #   - an explicit `name`, `type` (Ride | WeightTraining | ...), `description`.
 #
@@ -20,10 +20,10 @@
 
 sessions:
   - day: Tue
-    workout: low_cadence
+    workout: sweet_spot
     # Already completed as a 149-TSS outdoor ride; this entry is skipped if the
     # day already has an event. For future weeks, keep it indoor: ~60 min,
-    # short easy recovery spins between the low-cadence blocks.
+    # sweet-spot blocks with easy recovery spins between.
     load: 70
     minutes: 60
     intensity: 0.85

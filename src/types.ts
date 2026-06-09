@@ -11,16 +11,17 @@ export interface WorkoutDefinition {
 export interface SchedulingConfig {
   tsb_fresh: number; // default 5
   tsb_fatigued: number; // default -10
-  tsb_very_fatigued: number; // default -20 — below this, drop low-cadence and reduce weights
+  tsb_very_fatigued: number; // default -20 — below this, drop sweet-spot and reduce weights
   weight_sessions: number; // default 2
   weight_sessions_very_fatigued: number; // default 1 — weight sessions when TSB < tsb_very_fatigued
   min_weight_gap_days: number; // default 2
   max_weekly_ramp_pct: number; // default 7 — CTL ramp above this triggers an easy-bias guard
+  hard_cycling_days: number; // default 1 — max hard interval rides/week (beyond the sweet-spot day); the 80/20 cap. Remaining days fill easy.
 }
 
 export interface Config {
   weight_training: WorkoutDefinition;
-  low_cadence: WorkoutDefinition;
+  sweet_spot: WorkoutDefinition;
   scheduling: SchedulingConfig;
 }
 
@@ -74,7 +75,7 @@ export interface XertTrainingInfo {
 
 // --- Scheduler ---
 
-export type WorkoutType = "cycling" | "low_cadence" | "weights" | "rest";
+export type WorkoutType = "cycling" | "sweet_spot" | "weights" | "rest";
 
 export type CyclingIntensity = "easy" | "moderate" | "hard";
 
@@ -83,7 +84,7 @@ export interface PlannedWorkout {
   type: WorkoutType;
   name: string;
   description: string;
-  intensity: CyclingIntensity | "hard"; // weights and low_cadence are always "hard"
+  intensity: CyclingIntensity | "hard"; // weights and sweet_spot are always "hard"
   targetZone?: Zone; // set on hard cycling days when zone distribution is supplied
 }
 

@@ -35,7 +35,7 @@ export function rampGuardTriggered(rampRatePct: number | undefined, config: Conf
 }
 
 function isHard(type: WorkoutType, intensity: CyclingIntensity | "hard"): boolean {
-  if (type === "weights" || type === "low_cadence") return true;
+  if (type === "weights" || type === "sweet_spot") return true;
   return intensity === "hard";
 }
 
@@ -57,7 +57,7 @@ function buildCyclingDescription(
   }
 }
 
-// Polarized placement: consolidate stress onto "hard days" (low-cadence +
+// Polarized placement: consolidate stress onto "hard days" (sweet-spot +
 // hard-cycling target days) so weights stack with them in the same session,
 // preserving full-recovery days for easy rides or rest. Within a stacked day,
 // the cycling workout precedes the weights session — hard intervals are done
@@ -65,9 +65,9 @@ function buildCyclingDescription(
 //
 // Fatigue tiers:
 //   - fresh:          hard cycling targets + weights co-locate on both
-//   - moderate/fatigued: only low-cadence is a natural hard day; weights
+//   - moderate/fatigued: only sweet-spot is a natural hard day; weights
 //                        stack with it and overflow to their own day(s)
-//   - very_fatigued:  day 0 reserved for rest; low-cadence dropped; a single
+//   - very_fatigued:  day 0 reserved for rest; sweet-spot dropped; a single
 //                     strength session placed mid-week
 export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const {
@@ -81,7 +81,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     completedDates,
   } = input;
   const days = 7;
-  const { scheduling, weight_training, low_cadence } = config;
+  const { scheduling, weight_training, sweet_spot } = config;
   const guardOn = rampGuardTriggered(rampRatePct, config);
 
   // Track zones already assigned to hard rides this week so consecutive hard
@@ -146,7 +146,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     });
   }
 
-  // Phase 1: low-cadence (mid-week), unless very fatigued.
+  // Phase 1: sweet-spot (mid-week), unless very fatigued.
   let lcIdx: number | undefined;
   if (!veryFatigued) {
     const lcCandidates = available.filter((i) => isEmpty(i) && !wouldCreateBackToBack(i));
@@ -154,9 +154,9 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     if (lcIdx !== undefined) {
       plan[lcIdx].push({
         date: dates[lcIdx],
-        type: "low_cadence",
-        name: low_cadence.name,
-        description: low_cadence.description,
+        type: "sweet_spot",
+        name: sweet_spot.name,
+        description: sweet_spot.description,
         intensity: "hard",
       });
     }
@@ -168,11 +168,11 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const hardCyclingTargets = new Set<number>();
   if (intensity === "hard") {
     for (const i of available) {
-      if (hardCyclingTargets.size >= weightSessionsTarget) break;
+      if (hardCyclingTargets.size >= scheduling.hard_cycling_days) break;
       if (!isEmpty(i)) continue;
       if (wouldCreateBackToBack(i)) continue;
       // Spacing: hard cycling days follow min_weight_gap_days from each other
-      // and from the low-cadence day, so co-located weights get proper rest.
+      // and from the sweet-spot day, so co-located weights get proper rest.
       const existingHardSpots = [lcIdx, ...hardCyclingTargets].filter(
         (x): x is number => x !== undefined,
       );
@@ -251,27 +251,20 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     });
   }
 
-  // Phase 5: fill remaining empty days with cycling at the default intensity,
-  // downgrading to easy if it would create back-to-back hard.
+  // Phase 5: fill every remaining empty day with an easy Zone 2 ride. Hard
+  // stress is deliberately concentrated into the sweet-spot session (Phase 1)
+  // and the capped hard-cycling target days (Phase 2, ≤ hard_cycling_days);
+  // everything else stays easy so the week holds the ~80/20 low-intensity
+  // majority. Filling these days "moderate" — the old behavior — is exactly the
+  // grey-zone trap the 80/20 / polarized evidence warns against, so we don't.
   for (let i = 0; i < days; i++) {
     if (!isEmpty(i) || lockedDates.has(dates[i])) continue;
-    let rideIntensity = intensity;
-    if (rideIntensity === "hard" && wouldCreateBackToBack(i)) {
-      rideIntensity = "easy";
-    }
-    const targetZone = rideIntensity === "hard" ? pickHardZone() : undefined;
     plan[i].push({
       date: dates[i],
       type: "cycling",
-      name:
-        rideIntensity === "easy"
-          ? "Easy Ride"
-          : rideIntensity === "moderate"
-            ? "Moderate Ride"
-            : (xertInfo.wotd_name ?? "Hard Ride"),
-      description: buildCyclingDescription(rideIntensity, xertInfo, targetZone),
-      intensity: rideIntensity,
-      ...(targetZone ? { targetZone } : {}),
+      name: "Easy Ride",
+      description: buildCyclingDescription("easy", xertInfo),
+      intensity: "easy",
     });
   }
 
@@ -280,7 +273,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   // AMPK signal has begun to fade.
   const typeRank = (t: WorkoutType): number => {
     if (t === "rest") return 0;
-    if (t === "cycling" || t === "low_cadence") return 1;
+    if (t === "cycling" || t === "sweet_spot") return 1;
     return 2; // weights
   };
   const out: PlannedWorkout[] = [];

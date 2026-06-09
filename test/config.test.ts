@@ -20,8 +20,8 @@ weight_training:
   duration_minutes: 60
   description: "Squat 3x8, Deadlift 3x5"
 
-low_cadence:
-  name: "Low Cadence Intervals"
+sweet_spot:
+  name: "Sweet Spot Intervals"
   duration_minutes: 60
   description: "4x10min at 60rpm"
 
@@ -41,7 +41,7 @@ describe("loadConfig", () => {
 
     expect(config.weight_training.name).toBe("Strength Session");
     expect(config.weight_training.duration_minutes).toBe(60);
-    expect(config.low_cadence.name).toBe("Low Cadence Intervals");
+    expect(config.sweet_spot.name).toBe("Sweet Spot Intervals");
     expect(config.scheduling.tsb_fresh).toBe(5);
     expect(config.scheduling.tsb_fatigued).toBe(-10);
     expect(config.scheduling.weight_sessions).toBe(2);
@@ -54,8 +54,8 @@ weight_training:
   duration_minutes: 45
   description: "Basic routine"
 
-low_cadence:
-  name: "Low Cadence"
+sweet_spot:
+  name: "Sweet Spot"
   duration_minutes: 60
   description: "Slow grinding"
 `;
@@ -80,7 +80,7 @@ weight_training:
   duration_minutes: 60
   description: "test"
 
-low_cadence:
+sweet_spot:
   name: "LC"
   duration_minutes: 60
   description: "test"
@@ -96,8 +96,8 @@ scheduling:
 
   it("throws if weight_training is missing", async () => {
     const bad = `
-low_cadence:
-  name: "Low Cadence"
+sweet_spot:
+  name: "Sweet Spot"
   duration_minutes: 60
   description: "test"
 `;
@@ -107,7 +107,7 @@ low_cadence:
     await expect(loadConfig(file)).rejects.toThrow("weight_training");
   });
 
-  it("throws if low_cadence is missing", async () => {
+  it("throws if sweet_spot is missing", async () => {
     const bad = `
 weight_training:
   name: "Strength"
@@ -117,7 +117,7 @@ weight_training:
     const file = path.join(tmpDir, "config.yaml");
     await fs.writeFile(file, bad, "utf8");
 
-    await expect(loadConfig(file)).rejects.toThrow("low_cadence");
+    await expect(loadConfig(file)).rejects.toThrow("sweet_spot");
   });
 
   it("applies a single scheduling override while keeping other defaults", async () => {
@@ -127,7 +127,7 @@ weight_training:
   duration_minutes: 60
   description: "test"
 
-low_cadence:
+sweet_spot:
   name: "LC"
   duration_minutes: 60
   description: "test"
@@ -152,7 +152,7 @@ weight_training:
   duration_minutes: 60
   description: "test"
 
-low_cadence:
+sweet_spot:
   name: "LC"
   duration_minutes: 60
   description: "test"

@@ -10,6 +10,7 @@ const SCHEDULING_DEFAULTS: SchedulingConfig = {
   weight_sessions_very_fatigued: 1,
   min_weight_gap_days: 2,
   max_weekly_ramp_pct: 7,
+  hard_cycling_days: 1,
 };
 
 function validateScheduling(raw: unknown): Partial<SchedulingConfig> {
@@ -27,6 +28,7 @@ function validateScheduling(raw: unknown): Partial<SchedulingConfig> {
     "weight_sessions_very_fatigued",
     "min_weight_gap_days",
     "max_weekly_ramp_pct",
+    "hard_cycling_days",
   ];
   for (const field of numericFields) {
     if (obj[field] === undefined) continue;
@@ -68,12 +70,12 @@ export async function loadConfig(filePath: string): Promise<Config> {
   }
 
   const weight_training = validateWorkout(doc.weight_training, "weight_training");
-  const low_cadence = validateWorkout(doc.low_cadence, "low_cadence");
+  const sweet_spot = validateWorkout(doc.sweet_spot, "sweet_spot");
 
   const scheduling: SchedulingConfig = {
     ...SCHEDULING_DEFAULTS,
     ...validateScheduling(doc.scheduling),
   };
 
-  return { weight_training, low_cadence, scheduling };
+  return { weight_training, sweet_spot, scheduling };
 }

@@ -59,8 +59,8 @@ export function formatPlan(workouts: PlannedWorkout[]): string {
         ? "  "
         : w.type === "weights"
           ? "WT"
-          : w.type === "low_cadence"
-            ? "LC"
+          : w.type === "sweet_spot"
+            ? "SS"
             : "CY";
     const zoneTag = w.targetZone ? ` (${zoneLabel(w.targetZone)})` : "";
     return `${w.date} (${day})  [${icon}]  ${w.name}  — ${w.intensity}${zoneTag}`;
@@ -72,7 +72,7 @@ export function formatPlan(workouts: PlannedWorkout[]): string {
 // mapping is updated.
 const WORKOUT_TYPE_TO_EVENT_TYPE: Record<WorkoutType, string> = {
   cycling: "Ride",
-  low_cadence: "Ride",
+  sweet_spot: "Ride",
   weights: "WeightTraining",
   rest: "Note",
 };
@@ -229,7 +229,7 @@ async function main() {
     fresh: "fresh — scheduling hard rides",
     moderate: "moderate — mixed intensity",
     fatigued: "fatigued — cycling kept easy",
-    very_fatigued: "very fatigued — dropped low-cadence, reduced weights",
+    very_fatigued: "very fatigued — dropped sweet-spot, reduced weights",
   };
 
   console.log("=== Weekly Plan ===");

@@ -24,7 +24,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface PlanSession {
   day: string | number;
-  workout?: "low_cadence" | "weight_training";
+  workout?: "sweet_spot" | "weight_training";
   name?: string;
   type?: string;
   description?: string;
