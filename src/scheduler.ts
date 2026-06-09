@@ -23,6 +23,36 @@ export function classifyFatigue(tsb: number, config: Config): FatigueLevel {
   return "moderate";
 }
 
+export type Phase = "block" | "taper";
+
+// Phase from weeks-to-race. `taper` once fewer than taper_weeks remain; `block`
+// (the heavy 12-14 week strength block) otherwise. Undefined when no race is
+// known, so the planner keeps its default (non-periodized) behavior.
+export function classifyPhase(
+  weeksToRace: number | undefined,
+  config: Config,
+): Phase | undefined {
+  if (weeksToRace === undefined) return undefined;
+  if (weeksToRace < config.periodization.taper_weeks) return "taper";
+  return "block";
+}
+
+// Strength sessions/week the phase asks for (before the fatigue cap is applied).
+// The final taper week (< taper_zero_weeks) drops strength entirely.
+export function phaseWeightSessions(
+  phase: Phase | undefined,
+  weeksToRace: number | undefined,
+  config: Config,
+): number {
+  if (phase === "taper") {
+    if (weeksToRace !== undefined && weeksToRace < config.periodization.taper_zero_weeks) {
+      return 0;
+    }
+    return config.scheduling.weight_sessions_taper;
+  }
+  return config.scheduling.weight_sessions;
+}
+
 function classifyIntensity(fatigue: FatigueLevel): CyclingIntensity {
   if (fatigue === "fresh") return "hard";
   if (fatigue === "fatigued" || fatigue === "very_fatigued") return "easy";

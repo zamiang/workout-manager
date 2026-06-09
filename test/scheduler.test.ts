@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { schedule, classifyFatigue, rampGuardTriggered } from "../src/scheduler.js";
+import { schedule, classifyFatigue, rampGuardTriggered, classifyPhase, phaseWeightSessions } from "../src/scheduler.js";
 import { emptyDistribution } from "../src/zones.js";
 import type { SchedulerInput, IntervalsEvent, Config, PlannedWorkout } from "../src/types.js";
 
@@ -24,6 +24,7 @@ const BASE_CONFIG: Config = {
     tsb_very_fatigued: -20,
     weight_sessions: 2,
     weight_sessions_very_fatigued: 1,
+    weight_sessions_taper: 1,
     min_weight_gap_days: 2,
     max_weekly_ramp_pct: 7,
     hard_cycling_days: 1,
@@ -35,6 +36,11 @@ const BASE_CONFIG: Config = {
     hard_if: 0.88,
     hard_minutes: 75,
     sweet_spot_if: 0.88,
+  },
+  periodization: {
+    taper_weeks: 4,
+    taper_zero_weeks: 1,
+    race_date: null,
   },
 };
 
@@ -525,6 +531,29 @@ describe("schedule", () => {
       expect(ride.description).toContain("SMART Workout 42");
       expect(ride.description).toContain("4x4min VO2max");
     }
+  });
+
+  describe("classifyPhase / phaseWeightSessions", () => {
+    it("returns undefined when weeksToRace is undefined", () => {
+      expect(classifyPhase(undefined, BASE_CONFIG)).toBeUndefined();
+      expect(phaseWeightSessions(undefined, undefined, BASE_CONFIG)).toBe(2);
+    });
+
+    it("classifies block at or beyond taper_weeks", () => {
+      expect(classifyPhase(4, BASE_CONFIG)).toBe("block");
+      expect(classifyPhase(12, BASE_CONFIG)).toBe("block");
+      expect(phaseWeightSessions("block", 12, BASE_CONFIG)).toBe(2);
+    });
+
+    it("classifies taper below taper_weeks", () => {
+      expect(classifyPhase(3, BASE_CONFIG)).toBe("taper");
+      expect(phaseWeightSessions("taper", 3, BASE_CONFIG)).toBe(1);
+    });
+
+    it("returns zero sessions in the final taper week", () => {
+      expect(classifyPhase(0, BASE_CONFIG)).toBe("taper");
+      expect(phaseWeightSessions("taper", 0, BASE_CONFIG)).toBe(0);
+    });
   });
 
   describe("planned-load targets", () => {
