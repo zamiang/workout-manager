@@ -2,57 +2,84 @@ weight_training:
   name: "Cyclist Strength Routine"
   duration_minutes: 60
   description: |
-    Warm-Up (5 min)
-    Deadbugs (2x10), hip circles, band pull-aparts — get the core switched on and shoulders mobile.
+    Warm-Up (8 min)
+    Deadbugs (2x10), hip circles, band pull-aparts, bodyweight squats — get the
+    core switched on and the hips/shoulders mobile. Then 2 light ramp-up sets on
+    your first heavy lift before working weight.
 
-    Block 1: Lower Body Power (20 min)
-    1. Straight Leg Deadlift (Band) — 4x10-12
-       Your primary hip hinge. Stand on band, hinge deep, squeeze glutes at top.
-    2. Bulgarian Split Squat (15lb DBs) — 3x10 each leg
-       Single-leg strength and hip stability. Take your time, control the descent.
-    3. Hip Thrust (Bodyweight or band across hips) — 3x12-15
-       Glute activation and top-end hip extension — directly translates to power phase of pedal stroke.
-    4. Single-Leg Calf Raise — 2x15 each leg
-       Often neglected but important for ankle stability and pedaling efficiency.
+    Block 1: Heavy Strength (30 min) — the part that actually moves your power.
+    Lift heavy, low reps, and rest 2-3 min between sets. These are loadable on
+    purpose so you can progress over time.
+    1. Goblet or Barbell Back Squat — 4x5-6 @ heavy
+       The single highest-yield lift for cycling power. Drive through mid-foot,
+       full depth, brace the core. This bilateral squat is the anchor of the day.
+    2. Romanian / Trap-Bar Deadlift — 3x5-6 @ heavy
+       Your loaded hip hinge — replaces the band deadlift so you can keep adding
+       weight. Hinge from the hips, neutral spine, squeeze glutes at the top.
+    3. Bulgarian Split Squat (Dumbbells) — 3x6-8 each leg @ heavy
+       Single-leg strength and hip stability. Hold DBs and load it — work toward
+       30-40lb. Control the descent, drive through the front heel.
+    4. Single-Leg Calf Raise — 2x12-15 each leg
+       Ankle stability and pedaling efficiency. Single-leg, full range, add a DB
+       once bodyweight is easy.
 
-    Block 2: Upper Body Balance (15 min)
-    5. Bent Over Row (Band) — 4x12
-       Upper back strength, counters cycling posture.
+    Block 2: Upper Body Balance (12 min) — accessory, keep it brisk.
+    5. Bent Over Row (Band or DB) — 3x10-12
+       Upper back strength, counters cycling posture. Use DBs if you have them so
+       you can progress.
     6. Push Up (Band or regular) — 3x12-15
-       Chest and triceps. Add band for progressive resistance.
-    7. Face Pull (Band) — 3x15
-       Rear delts and external rotators — keeps shoulders healthy and pulls you out of that hunched position.
+       Chest and triceps. Add band or elevate feet for progressive resistance.
+    7. Face Pull (Band or Cable) — 3x15
+       Rear delts and external rotators — keeps shoulders healthy and pulls you
+       out of that hunched riding position.
 
-    Block 3: Core Stability (10 min)
+    Block 3: Core Stability (8 min)
     8. Ab Wheel — 3x8-10
        Anti-extension. If too difficult, do them from knees with limited range.
-    9. Side Plank — 3x30-40 sec each side
+    9. Side Plank — 3x30-45 sec each side
        Anti-lateral flexion. Keeps your hips from dropping while pedaling.
     10. Pallof Press (Band) — 2x10 each side
-        Anti-rotation. Anchor the band at chest height, press out and hold against the pull.
+        Anti-rotation. Anchor the band at chest height, press out and hold.
 
-    Cooldown (5-10 min)
-    Hip flexor stretch, pigeon pose, chest doorway stretch — address the areas that get tight from riding.
+    Cooldown (5 min)
+    Hip flexor stretch, pigeon pose, chest doorway stretch — address the areas
+    that get tight from riding.
 
-low_cadence:
-  name: "Low Cadence Strength Intervals"
+    Progression rule: when you complete every set at the TOP of the rep range
+    with good form, add load (or reps on bodyweight moves) next session. If a lift
+    sits at the same weight x reps for 3+ sessions, it has stalled — bump it.
+
+sweet_spot:
+  name: "Sweet Spot Intervals"
   duration_minutes: 60
   description: |
     Warm-up (15 min)
-    Easy Zone 2 spin at natural cadence (85-95 rpm), building heart rate gradually.
+    Easy Zone 2 spin at natural cadence (85-95 rpm), with 2-3 short 30s openers
+    near threshold in the last 5 min to prime the legs.
 
-    Main Set: 4 x 10 min @ 55-65 rpm
-    Seated, sustained threshold effort (85-95% FTP). Stay smooth — no rocking,
-    no mashing. Focus on even pressure through the full pedal stroke. The goal
-    is neuromuscular recruitment, not max watts.
-    5 min easy spin between intervals at 90+ rpm to flush the legs.
+    Main Set: 3 x 12 min @ 88-94% FTP (~230-244W at 260 FTP)
+    Seated, sustained sweet-spot effort at your self-selected cadence (most
+    riders settle around 85-95 rpm — let it come naturally, don't force it low).
+    This is the highest-yield cycling session for raising lactate threshold and
+    FTP. Hold steady, even power; the work is in the back half of each rep.
+    5 min easy Zone 1-2 spin between intervals to partially recover.
 
-    Cooldown (10 min)
-    Easy Zone 1 spin at 95+ rpm.
+    Cooldown (8 min)
+    Easy Zone 1 spin at a comfortable cadence.
 
-    Notes
-    If cadence drifts above 65 rpm, shift up or add resistance. If form breaks
-    down (hips rocking, lower back engaging), end the interval early.
+    Progression
+    When 3 x 12 min feels sustainable, extend to 3 x 15 min, then 2 x 20 min,
+    then nudge the target toward 95% FTP. Re-test FTP every 6-8 weeks and reset
+    the wattage targets.
+
+    Why this replaced low-cadence grinding
+    A 12-week RCT in veteran cyclists (mean age 47) found moderate-intensity
+    40rpm intervals produced no gain in aerobic capacity, performance, power, or
+    leg strength (Paton et al., Front. Physiol. 2014). Sweet-spot/threshold work
+    directly raised threshold W/kg in recreational men of the same age cohort
+    (MDPI Sports 2024). Heavy barbell work — not big-gear grinding — is the
+    evidence-backed route to force adaptations; that's the weight_training day.
+    See cycling-training-report.md for full citations.
 
 scheduling:
   tsb_fresh: 5
@@ -62,3 +89,24 @@ scheduling:
   weight_sessions_very_fatigued: 1
   min_weight_gap_days: 2
   max_weekly_ramp_pct: 7
+  # 80/20 enforcement: hard interval rides per week, on top of the one
+  # sweet-spot session. With 1, a fresh week has at most 2 hard cycling days
+  # (sweet-spot + 1); every other day fills as easy Zone 2 base. Raise toward 2
+  # only in a dedicated build block — keeping this low is what holds the
+  # ~80% low-intensity majority the evidence calls for (see
+  # cycling-training-report.md). All non-quality days are now easy, never
+  # "moderate" — moderate-everywhere riding is the grey-zone trap to avoid.
+  hard_cycling_days: 1
+
+# Planned-load targets the planner attaches to each generated workout, so the
+# calendar shows TSS/duration/IF and Intervals.icu folds them into planned CTL.
+# TSS = (minutes / 60) * IF^2 * 100. The latest easy ride each week is promoted
+# to a single long endurance ride (long_minutes) — the century durability anchor.
+# Tune these to your FTP and the volume your week can absorb.
+load_targets:
+  easy_if: 0.62 # easy Zone 2 intensity factor (~160W at 260 FTP)
+  easy_minutes: 75 # standard easy ride duration → ~48 TSS
+  long_minutes: 180 # weekly long endurance ride → ~127 TSS (build this up over a block)
+  hard_if: 0.88 # hard interval ride IF → ~90 TSS at 75 min
+  hard_minutes: 75
+  sweet_spot_if: 0.88 # applied to the sweet_spot session (60 min) → ~77 TSS

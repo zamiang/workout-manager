@@ -4,7 +4,7 @@ import { emptyDistribution } from "../src/zones.js";
 import type { SchedulerInput, IntervalsEvent, Config, PlannedWorkout } from "../src/types.js";
 
 function isHardEntry(w: PlannedWorkout): boolean {
-  return w.type === "weights" || w.type === "low_cadence" || w.intensity === "hard";
+  return w.type === "weights" || w.type === "sweet_spot" || w.intensity === "hard";
 }
 
 const BASE_CONFIG: Config = {
@@ -13,8 +13,8 @@ const BASE_CONFIG: Config = {
     duration_minutes: 60,
     description: "Squat, deadlift, etc.",
   },
-  low_cadence: {
-    name: "Low Cadence Intervals",
+  sweet_spot: {
+    name: "Sweet Spot Intervals",
     duration_minutes: 60,
     description: "4x10min at 60rpm",
   },
@@ -26,6 +26,15 @@ const BASE_CONFIG: Config = {
     weight_sessions_very_fatigued: 1,
     min_weight_gap_days: 2,
     max_weekly_ramp_pct: 7,
+    hard_cycling_days: 1,
+  },
+  load_targets: {
+    easy_if: 0.62,
+    easy_minutes: 75,
+    long_minutes: 180,
+    hard_if: 0.88,
+    hard_minutes: 75,
+    sweet_spot_if: 0.88,
   },
 };
 
@@ -56,9 +65,9 @@ describe("schedule", () => {
     expect(distinctDates.has("2026-04-26")).toBe(true);
   });
 
-  it("includes exactly 1 low cadence session", () => {
+  it("includes exactly 1 sweet-spot session", () => {
     const result = schedule(makeInput());
-    const lc = result.filter((w) => w.type === "low_cadence");
+    const lc = result.filter((w) => w.type === "sweet_spot");
     expect(lc).toHaveLength(1);
   });
 
@@ -142,7 +151,7 @@ describe("schedule", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("uses moderate intensity cycling when TSB is between thresholds", () => {
+  it("fills non-quality cycling with easy Zone 2 when TSB is between thresholds", () => {
     const result = schedule(
       makeInput({
         trainingLoad: { ctl: 50, atl: 52, tsb: 0 },
@@ -150,38 +159,39 @@ describe("schedule", () => {
     );
     const cycling = result.filter((w) => w.type === "cycling");
     expect(cycling.length).toBeGreaterThan(0);
-    // Moderate TSB allows moderate or easy (easy only when needed to avoid
-    // back-to-back hard). "hard" would violate the classification.
+    // 80/20 policy: a moderate-TSB week has no hard cycling targets, so every
+    // filled ride is easy — never the grey-zone "moderate".
     for (const ride of cycling) {
-      expect(["moderate", "easy"]).toContain(ride.intensity);
+      expect(ride.intensity).toBe("easy");
     }
   });
 
-  it("treats TSB exactly at tsb_fresh as moderate, not hard", () => {
+  it("treats TSB exactly at tsb_fresh as moderate fatigue → all-easy fills", () => {
     const result = schedule(
       makeInput({
-        // tsb_fresh is 5; classifyIntensity uses strict `>`, so 5 is moderate.
+        // tsb_fresh is 5; classifyFatigue uses strict `>`, so 5 is moderate,
+        // which means no hard cycling targets and an all-easy cycling fill.
         trainingLoad: { ctl: 50, atl: 45, tsb: 5 },
       }),
     );
     const cycling = result.filter((w) => w.type === "cycling");
     expect(cycling.length).toBeGreaterThan(0);
     for (const ride of cycling) {
-      expect(["moderate", "easy"]).toContain(ride.intensity);
+      expect(ride.intensity).toBe("easy");
     }
   });
 
-  it("treats TSB exactly at tsb_fatigued as moderate, not easy-forced", () => {
+  it("fills non-quality cycling days with easy Zone 2, never moderate (80/20 base)", () => {
     const result = schedule(
       makeInput({
         trainingLoad: { ctl: 50, atl: 60, tsb: -10 },
       }),
     );
     const cycling = result.filter((w) => w.type === "cycling");
-    // Exact boundary is moderate — at least one moderate ride should exist
-    // unless every cycling slot was downgraded to easy for back-to-back reasons.
-    const moderateCount = cycling.filter((w) => w.intensity === "moderate").length;
-    expect(moderateCount).toBeGreaterThan(0);
+    expect(cycling.length).toBeGreaterThan(0);
+    for (const ride of cycling) {
+      expect(ride.intensity).toBe("easy");
+    }
   });
 
   it("degrades gracefully when most days are locked", () => {
@@ -213,9 +223,9 @@ describe("schedule", () => {
   describe("weights co-location (polarized stacking)", () => {
     const freshLoad = { ctl: 50, atl: 40, tsb: 10 };
 
-    it("co-locates at least one weights session with the low-cadence day", () => {
+    it("co-locates at least one weights session with the sweet-spot day", () => {
       const result = schedule(makeInput());
-      const lcDate = result.find((w) => w.type === "low_cadence")?.date;
+      const lcDate = result.find((w) => w.type === "sweet_spot")?.date;
       const weightDates = new Set(result.filter((w) => w.type === "weights").map((w) => w.date));
       expect(lcDate).toBeDefined();
       expect(weightDates.has(lcDate!)).toBe(true);
@@ -232,7 +242,7 @@ describe("schedule", () => {
       }
       let checked = 0;
       for (const [, entries] of byDate) {
-        const cyclingTypes = new Set(["cycling", "low_cadence"]);
+        const cyclingTypes = new Set(["cycling", "sweet_spot"]);
         const hasCycling = entries.some((w) => cyclingTypes.has(w.type));
         const hasWeights = entries.some((w) => w.type === "weights");
         if (hasCycling && hasWeights) {
@@ -260,9 +270,9 @@ describe("schedule", () => {
   describe("very fatigued (TSB below tsb_very_fatigued)", () => {
     const veryFatiguedLoad = { ctl: 56, atl: 86, tsb: -30 };
 
-    it("drops the low-cadence session entirely", () => {
+    it("drops the sweet-spot session entirely", () => {
       const result = schedule(makeInput({ trainingLoad: veryFatiguedLoad }));
-      expect(result.filter((w) => w.type === "low_cadence")).toHaveLength(0);
+      expect(result.filter((w) => w.type === "sweet_spot")).toHaveLength(0);
     });
 
     it("reduces weight sessions to weight_sessions_very_fatigued", () => {
@@ -347,9 +357,9 @@ describe("schedule", () => {
   describe("no hard stacking on recovery weeks", () => {
     const fatiguedLoad = { ctl: 50, atl: 70, tsb: -15 };
 
-    it("does not co-locate weights on the low-cadence day when fatigued", () => {
+    it("does not co-locate weights on the sweet-spot day when fatigued", () => {
       const result = schedule(makeInput({ trainingLoad: fatiguedLoad }));
-      const lcDate = result.find((w) => w.type === "low_cadence")?.date;
+      const lcDate = result.find((w) => w.type === "sweet_spot")?.date;
       expect(lcDate).toBeDefined();
       const sameDay = result.filter((w) => w.date === lcDate);
       expect(sameDay.some((w) => w.type === "weights")).toBe(false);
@@ -396,10 +406,10 @@ describe("schedule", () => {
       }
     });
 
-    it("still places weight + low-cadence sessions when guard fires", () => {
+    it("still places weight + sweet-spot sessions when guard fires", () => {
       const result = schedule(makeInput({ trainingLoad: freshLoad, rampRatePct: 9.5 }));
-      // Guard only affects cycling intensity, not strength/low-cadence cadence.
-      expect(result.filter((w) => w.type === "low_cadence")).toHaveLength(1);
+      // Guard only affects cycling intensity, not strength/sweet-spot cadence.
+      expect(result.filter((w) => w.type === "sweet_spot")).toHaveLength(1);
       expect(result.filter((w) => w.type === "weights")).toHaveLength(2);
     });
   });
@@ -450,7 +460,16 @@ describe("schedule", () => {
 
     it("does not assign duplicate zones across multiple hard rides", () => {
       const dist = { ...emptyDistribution(), endurance: 1.0 };
-      const result = schedule(makeInput({ trainingLoad: freshLoad, zoneDistribution: dist }));
+      // The default 80/20 cap is 1 hard cycling day; raise it to 2 here so the
+      // multi-hard-ride zone-distinctness behavior is exercised. A real build
+      // block is where you'd bump hard_cycling_days like this.
+      const cfg: Config = {
+        ...BASE_CONFIG,
+        scheduling: { ...BASE_CONFIG.scheduling, hard_cycling_days: 2 },
+      };
+      const result = schedule(
+        makeInput({ trainingLoad: freshLoad, zoneDistribution: dist, config: cfg }),
+      );
       const zones = result
         .filter((w) => w.type === "cycling" && w.intensity === "hard")
         .map((w) => w.targetZone);
@@ -506,5 +525,53 @@ describe("schedule", () => {
       expect(ride.description).toContain("SMART Workout 42");
       expect(ride.description).toContain("4x4min VO2max");
     }
+  });
+
+  describe("planned-load targets", () => {
+    it("attaches TSS, duration, and IF to every non-rest workout", () => {
+      const result = schedule(makeInput({ trainingLoad: { ctl: 50, atl: 40, tsb: 10 } }));
+      for (const w of result) {
+        if (w.type === "rest") continue;
+        expect(typeof w.durationMin).toBe("number");
+        if (w.type === "weights") {
+          // Weights carry duration only — no TSS/IF (matches Intervals.icu).
+          expect(w.load).toBeUndefined();
+          expect(w.intensityFactor).toBeUndefined();
+        } else {
+          expect(typeof w.load).toBe("number");
+          expect(typeof w.intensityFactor).toBe("number");
+        }
+      }
+    });
+
+    it("computes sweet-spot TSS from its duration and sweet_spot_if", () => {
+      const result = schedule(makeInput());
+      const ss = result.find((w) => w.type === "sweet_spot");
+      expect(ss).toBeDefined();
+      // 60 min @ IF 0.88 → (60/60) * 0.88^2 * 100 = 77.44 → 77
+      expect(ss!.durationMin).toBe(60);
+      expect(ss!.intensityFactor).toBe(0.88);
+      expect(ss!.load).toBe(77);
+    });
+
+    it("promotes exactly one easy ride to the weekly long endurance ride", () => {
+      const result = schedule(makeInput());
+      const longRides = result.filter((w) => w.name === "Long Endurance Ride");
+      expect(longRides).toHaveLength(1);
+      expect(longRides[0].durationMin).toBe(180);
+      expect(longRides[0].intensity).toBe("easy");
+      // 180 min @ IF 0.62 → 3 * 0.3844 * 100 = 115.3 → 115
+      expect(longRides[0].load).toBe(115);
+    });
+
+    it("gives weights a duration target but no TSS", () => {
+      const result = schedule(makeInput());
+      const weights = result.filter((w) => w.type === "weights");
+      expect(weights.length).toBeGreaterThan(0);
+      for (const w of weights) {
+        expect(w.durationMin).toBe(60);
+        expect(w.load).toBeUndefined();
+      }
+    });
   });
 });

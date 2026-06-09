@@ -2,7 +2,7 @@
 
 Weekly training planner for cyclists. Reads current form (CTL/ATL/TSB) from
 Intervals.icu and training recommendations from Xert, schedules a 7-day plan of
-cycling, low-cadence strength intervals, weight training, and recovery, then
+cycling, sweet-spot intervals, weight training, and recovery, then
 pushes the plan as events to the Intervals.icu calendar.
 
 ## Install
@@ -27,13 +27,23 @@ Credentials live in `.env`:
 Workout definitions and scheduling rules live in `config.yaml`:
 
 - `weight_training` — name, duration, and description pushed on weight days.
-- `low_cadence` — name, duration, and description pushed on low-cadence days.
+- `sweet_spot` — name, duration, and description pushed on the weekly quality (sweet-spot) day.
 - `scheduling.tsb_fresh` — TSB above this is considered "fresh" (default `5`).
 - `scheduling.tsb_fatigued` — TSB below this is considered "fatigued" (default `-10`).
 - `scheduling.weight_sessions` — weight sessions per week (default `2`).
 - `scheduling.min_weight_gap_days` — minimum days between weight sessions (default `2`).
 - `scheduling.max_weekly_ramp_pct` — CTL ramp above this triggers an easy-bias
   guard (default `7`).
+- `scheduling.hard_cycling_days` — max hard interval rides per week, on top of
+  the sweet-spot day (default `1`). This is the 80/20 cap: every non-quality day
+  fills as easy Zone 2, never "moderate". Raise to `2` only for a dedicated
+  build block.
+- `load_targets` — planned TSS/duration/IF the planner attaches to each
+  generated workout (so the calendar shows targets and Intervals.icu folds them
+  into planned CTL). TSS = `(minutes / 60) * IF^2 * 100`. The latest easy ride
+  each week is auto-promoted to a single long endurance ride (`long_minutes`),
+  the century durability anchor. Keys: `easy_if`, `easy_minutes`, `long_minutes`,
+  `hard_if`, `hard_minutes`, `sweet_spot_if`.
 
 ## Commands
 
@@ -73,16 +83,19 @@ re-running never duplicates.
 
 For each 7-day window, starting from today:
 
-1. **Place one low-cadence session** mid-week when possible, avoiding
+1. **Place one sweet-spot session** mid-week when possible, avoiding
    back-to-back hard days.
 2. **Place two weight sessions** with at least `min_weight_gap_days` between
    them, again avoiding back-to-back hard days.
 3. **Place one rest day**, preferring the day after a hard cluster.
-4. **Fill remaining days with cycling.** Intensity is driven by TSB: above
-   `tsb_fresh` → hard, below `tsb_fatigued` → easy, otherwise moderate. Any
-   ride that would create back-to-back hard days is downgraded to easy.
+4. **Fill remaining days with easy Zone 2 rides.** Hard stress is deliberately
+   concentrated into the sweet-spot session plus up to `hard_cycling_days` hard
+   interval rides (placed only when TSB is fresh and the ramp guard is off);
+   every other day fills as easy Zone 2. This holds the ~80/20 low-intensity
+   majority the training-science evidence calls for — the planner never
+   schedules "moderate" grey-zone fills. See `cycling-training-report.md`.
 
-Weight and low-cadence days are always classified as "hard" for the
+Weight and sweet-spot days are always classified as "hard" for the
 back-to-back constraint.
 
 On **fresh** or **moderate** weeks, weight sessions are co-located onto hard

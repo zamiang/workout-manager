@@ -55,8 +55,8 @@ describe("formatPlan", () => {
     },
     {
       date: "2026-04-22",
-      type: "low_cadence",
-      name: "Low Cadence Intervals",
+      type: "sweet_spot",
+      name: "Sweet Spot Intervals",
       description: "4x10 at 60rpm",
       intensity: "hard",
     },
@@ -82,7 +82,7 @@ describe("formatPlan", () => {
     const out = formatPlan(week);
     expect(out).toContain("[CY]"); // cycling
     expect(out).toContain("[WT]"); // weights
-    expect(out).toContain("[LC]"); // low_cadence
+    expect(out).toContain("[SS]"); // sweet_spot
     expect(out).toMatch(/\[ {2}\]/); // rest — two spaces
   });
 
@@ -150,10 +150,10 @@ describe("workoutToEvent", () => {
     expect(event.start_date_local).toBe("2026-04-22T00:00:00");
   });
 
-  it("maps low_cadence to a Ride workout", () => {
+  it("maps sweet_spot to a Ride workout", () => {
     const event = workoutToEvent({
       date: "2026-04-22",
-      type: "low_cadence",
+      type: "sweet_spot",
       name: "LC",
       description: "",
       intensity: "hard",
@@ -184,5 +184,34 @@ describe("workoutToEvent", () => {
     });
     expect(event.category).toBe("NOTE");
     expect(event.type).toBe("Note");
+  });
+
+  it("maps planned-load targets to icu_training_load, moving_time, and icu_intensity", () => {
+    const event = workoutToEvent({
+      date: "2026-04-20",
+      type: "cycling",
+      name: "Sweet Spot Intervals",
+      description: "",
+      intensity: "hard",
+      load: 77,
+      durationMin: 60,
+      intensityFactor: 0.88,
+    });
+    expect(event.icu_training_load).toBe(77);
+    expect(event.moving_time).toBe(3600); // 60 min → seconds
+    expect(event.icu_intensity).toBe(0.88);
+  });
+
+  it("omits planned-load fields when the workout has no targets", () => {
+    const event = workoutToEvent({
+      date: "2026-04-20",
+      type: "cycling",
+      name: "Hard Ride",
+      description: "",
+      intensity: "hard",
+    });
+    expect(event.icu_training_load).toBeUndefined();
+    expect(event.moving_time).toBeUndefined();
+    expect(event.icu_intensity).toBeUndefined();
   });
 });
