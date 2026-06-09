@@ -199,5 +199,96 @@ describe("IntervalsClient", () => {
       );
       expect(created.id).toBe(42);
     });
+
+    it("serializes planned-load fields when present", async () => {
+      const event: IntervalsEvent = {
+        start_date_local: "2026-06-13",
+        name: "Endurance Z2 Ride",
+        category: "WORKOUT",
+        type: "Ride",
+        description: "Long easy ride",
+        icu_training_load: 75,
+        moving_time: 6300,
+        icu_intensity: 0.65,
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...event, id: 7 }),
+      });
+
+      await client.createEvent(event);
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body).toMatchObject({
+        icu_training_load: 75,
+        moving_time: 6300,
+        icu_intensity: 0.65,
+      });
+    });
+  });
+
+  describe("updateEvent", () => {
+    it("PUTs an event to its id endpoint", async () => {
+      const event: IntervalsEvent = {
+        start_date_local: "2026-06-13",
+        name: "Endurance Z2 Ride",
+        category: "WORKOUT",
+        type: "Ride",
+        icu_training_load: 75,
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ ...event, id: 42 }),
+      });
+
+      const updated = await client.updateEvent(42, event);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://intervals.icu/api/v1/athlete/0/events/42",
+        expect.objectContaining({ method: "PUT", body: JSON.stringify(event) }),
+      );
+      expect(updated.id).toBe(42);
+    });
+
+    it("throws on non-ok response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        text: async () => "Not Found",
+      });
+
+      await expect(
+        client.updateEvent(99, {
+          start_date_local: "2026-06-13",
+          name: "x",
+          category: "WORKOUT",
+        }),
+      ).rejects.toThrow("Intervals.icu API error (404)");
+    });
+  });
+
+  describe("deleteEvent", () => {
+    it("DELETEs an event by id", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, text: async () => "" });
+
+      await client.deleteEvent(42);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://intervals.icu/api/v1/athlete/0/events/42",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+    });
+
+    it("throws on non-ok response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        text: async () => "Forbidden",
+      });
+
+      await expect(client.deleteEvent(42)).rejects.toThrow("Intervals.icu API error (403)");
+    });
   });
 });

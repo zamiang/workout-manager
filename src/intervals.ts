@@ -105,4 +105,28 @@ export class IntervalsClient {
     }
     return res.json();
   }
+
+  async updateEvent(id: number, event: IntervalsEvent): Promise<IntervalsEvent> {
+    const url = `${BASE_URL}/athlete/${ATHLETE_ID}/events/${id}`;
+    const res = await this.fetch(url, {
+      method: "PUT",
+      headers: this.headers,
+      body: JSON.stringify(event),
+    });
+    if (!res.ok) {
+      throw new Error(`Intervals.icu API error (${res.status}): ${await res.text()}`);
+    }
+    return res.json();
+  }
+
+  async deleteEvent(id: number): Promise<void> {
+    const url = `${BASE_URL}/athlete/${ATHLETE_ID}/events/${id}`;
+    const res = await this.fetch(url, {
+      method: "DELETE",
+      headers: this.headers,
+    });
+    if (!res.ok) {
+      throw new Error(`Intervals.icu API error (${res.status}): ${await res.text()}`);
+    }
+  }
 }
