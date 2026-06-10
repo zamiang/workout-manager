@@ -284,9 +284,21 @@ describe("latestTrainingLoad", () => {
 
 describe("pushPlan", () => {
   const plan: PlannedWorkout[] = [
-    { date: "2026-06-08", type: "cycling", name: "Easy Ride", description: "z2", intensity: "easy" },
+    {
+      date: "2026-06-08",
+      type: "cycling",
+      name: "Easy Ride",
+      description: "z2",
+      intensity: "easy",
+    },
     { date: "2026-06-09", type: "rest", name: "Rest Day", description: "off", intensity: "easy" },
-    { date: "2026-06-10", type: "weights", name: "Strength", description: "lift", intensity: "hard" },
+    {
+      date: "2026-06-10",
+      type: "weights",
+      name: "Strength",
+      description: "lift",
+      intensity: "hard",
+    },
   ];
 
   it("skips rest days and pushes the rest", async () => {

@@ -11,9 +11,18 @@ const ev = (date: string, name: string, id?: number): IntervalsEvent => ({
 
 describe("planPushActions", () => {
   it("skips days that already have an event (default mode)", () => {
-    const actions = planPushActions([ev("2026-06-10", "New Ride")], [ev("2026-06-10", "Old", 1)], false);
+    const actions = planPushActions(
+      [ev("2026-06-10", "New Ride")],
+      [ev("2026-06-10", "Old", 1)],
+      false,
+    );
     expect(actions).toEqual([
-      { kind: "skip", date: "2026-06-10", event: actions[0].event, reason: "day already has an event" },
+      {
+        kind: "skip",
+        date: "2026-06-10",
+        event: actions[0].event,
+        reason: "day already has an event",
+      },
     ]);
   });
 
@@ -39,6 +48,9 @@ describe("planPushActions", () => {
 
   it("skips an existing event with no id under --replace", () => {
     const actions = planPushActions([ev("2026-06-10", "Ride")], [ev("2026-06-10", "Old")], true);
-    expect(actions[0]).toMatchObject({ kind: "skip", reason: "existing event has no id; cannot replace" });
+    expect(actions[0]).toMatchObject({
+      kind: "skip",
+      reason: "existing event has no id; cannot replace",
+    });
   });
 });

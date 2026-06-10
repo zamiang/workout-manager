@@ -137,7 +137,12 @@ export function planPushActions(
     if (!prior) {
       actions.push({ kind: "create", date, event });
     } else if (typeof prior.id !== "number") {
-      actions.push({ kind: "skip", date, event, reason: "existing event has no id; cannot replace" });
+      actions.push({
+        kind: "skip",
+        date,
+        event,
+        reason: "existing event has no id; cannot replace",
+      });
     } else {
       actions.push({ kind: "update", date, event, priorId: prior.id });
     }
