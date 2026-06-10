@@ -204,7 +204,7 @@ async function main() {
 const isMain =
   typeof process !== "undefined" &&
   process.argv[1] != null &&
-  process.argv[1].endsWith("push-week.ts");
+  (process.argv[1].endsWith("push-week.ts") || process.argv[1].endsWith("push-week.js"));
 
 if (isMain) {
   main().catch((err) => {
