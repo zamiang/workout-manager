@@ -605,6 +605,21 @@ describe("schedule", () => {
       const plan = schedule(makeInput({ config: BASE_CONFIG }));
       expect(plan.filter((w) => w.type === "weights").length).toBe(2);
     });
+
+    it("lets very-fatigued cap the block phase below its phase count", () => {
+      // block asks for 2; very-fatigued caps at weight_sessions_very_fatigued (1).
+      // Effective count is min(2, 1) = 1, and the block routine is still used.
+      const plan = schedule(
+        makeInput({
+          config: taperConfig,
+          weeksToRace: 12,
+          trainingLoad: { ctl: 56, atl: 86, tsb: -30 },
+        }),
+      );
+      const weights = plan.filter((w) => w.type === "weights");
+      expect(weights.length).toBe(1);
+      expect(weights[0].name).toBe("Strength");
+    });
   });
 
   describe("planned-load targets", () => {
