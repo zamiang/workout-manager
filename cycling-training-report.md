@@ -142,7 +142,7 @@ _(These are flagged as open questions in the research — worth a dedicated evid
 - Everything else **easy Zone 2** to support the 80/20 structure.
 - **Re-test every 6–8 weeks** and adjust zones.
 
-Getting from 3.4 → 4.0 W/kg is realistic over a season for a consistent recreational rider, but it's driven by **volume + structured threshold work + strength + body composition**, all compounding — not any single workout type.
+Getting from 3.2 → 4.0 W/kg is realistic over a season for a consistent recreational rider, but it's driven by **volume + structured threshold work + strength + body composition**, all compounding — not any single workout type.
 
 ---
 
