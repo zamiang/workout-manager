@@ -37,6 +37,9 @@ export class XertClient {
     }
 
     const data = await res.json();
+    if (!data || typeof data.access_token !== "string") {
+      throw new Error("Xert auth succeeded but the response had no access_token");
+    }
     this.accessToken = data.access_token;
   }
 

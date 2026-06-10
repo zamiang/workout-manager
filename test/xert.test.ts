@@ -64,6 +64,11 @@ describe("XertClient", () => {
 
       await expect(client.authenticate()).rejects.toThrow("Xert auth failed (401)");
     });
+
+    it("throws when the response has no access_token", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ token_type: "Bearer" }) });
+      await expect(client.authenticate()).rejects.toThrow("no access_token");
+    });
   });
 
   describe("getTrainingInfo", () => {
