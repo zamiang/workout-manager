@@ -16,6 +16,7 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ quiet: true });
 import { promises as fs } from "node:fs";
 import { parse } from "yaml";
+import { toLocalISODate } from "../src/dates.js";
 import { loadConfig } from "../src/config.js";
 import { IntervalsClient } from "../src/intervals.js";
 import type { Config, IntervalsEvent } from "../src/types.js";
@@ -58,7 +59,7 @@ function offsetForDay(day: string | number): number {
 function dateStr(anchor: Date, offset: number): string {
   const d = new Date(anchor);
   d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 }
 
 // Attach optional planned-load targets (TSS / duration / IF) when the session

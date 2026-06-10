@@ -4,6 +4,7 @@ import { loadConfig } from "./config.js";
 import { IntervalsClient } from "./intervals.js";
 import { XertClient } from "./xert.js";
 import { schedule, classifyFatigue, rampGuardTriggered } from "./scheduler.js";
+import { todayLocal, addLocalDays } from "./dates.js";
 import { computeDistribution, POLARIZED_TARGETS, ZONES, zoneLabel } from "./zones.js";
 import type {
   PlannedWorkout,
@@ -179,7 +180,7 @@ export async function pushPlan(
 }
 
 async function runCheck(intervals: IntervalsClient, xert: XertClient): Promise<number> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   let failures = 0;
   const step = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
     try {
@@ -220,13 +221,9 @@ async function main() {
 
   if (command === "status") {
     await xert.authenticate();
-    const today = new Date().toISOString().slice(0, 10);
-    const lookbackStart = new Date();
-    lookbackStart.setDate(lookbackStart.getDate() - 28);
-    const lookbackStr = lookbackStart.toISOString().slice(0, 10);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+    const today = todayLocal();
+    const lookbackStr = addLocalDays(today, -28);
+    const weekAgoStr = addLocalDays(today, -7);
 
     const [info, activities, wellnessRange] = await Promise.all([
       xert.getTrainingInfo(),
@@ -271,19 +268,11 @@ async function main() {
 
   // plan command
   await xert.authenticate();
-  const today = new Date().toISOString().slice(0, 10);
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + 6);
-  const endStr = endDate.toISOString().slice(0, 10);
-  const raceHorizon = new Date();
-  raceHorizon.setDate(raceHorizon.getDate() + 364);
-  const raceHorizonStr = raceHorizon.toISOString().slice(0, 10);
-  const lookbackStart = new Date();
-  lookbackStart.setDate(lookbackStart.getDate() - 28);
-  const lookbackStr = lookbackStart.toISOString().slice(0, 10);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+  const today = todayLocal();
+  const endStr = addLocalDays(today, 6);
+  const raceHorizonStr = addLocalDays(today, 364);
+  const lookbackStr = addLocalDays(today, -28);
+  const weekAgoStr = addLocalDays(today, -7);
 
   const [events, info, activities, wellnessRange, raceEvents] = await Promise.all([
     intervals.getEvents(today, endStr),

@@ -8,16 +8,11 @@
 import { config as loadEnv } from "dotenv";
 loadEnv({ quiet: true });
 import { IntervalsClient } from "../src/intervals.js";
-
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(`${dateStr}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+import { todayLocal, addLocalDays } from "../src/dates.js";
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-const oldest = args[0] ?? new Date().toISOString().slice(0, 10);
-const newest = args[1] ?? addDays(oldest, 6);
+const oldest = args[0] ?? todayLocal();
+const newest = args[1] ?? addLocalDays(oldest, 6);
 
 const client = new IntervalsClient(process.env.INTERVALS_API_KEY!);
 const events = await client.getEvents(oldest, newest);
