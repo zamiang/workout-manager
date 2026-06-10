@@ -40,14 +40,16 @@ export function weeksUntil(today: string, raceDate: string): number {
   return Math.ceil(diff / (7 * dayMs));
 }
 
-// CTL ramp = (today - 7d ago) / (7d ago) * 100. Returns undefined when the
-// 7-day-ago wellness entry is missing or zero (new athlete, gap in syncing).
+// CTL ramp = (newest - oldest) / oldest * 100 over the populated wellness days.
+// Entries with ctl <= 0 are dropped first — Intervals.icu may return today's
+// entry zeroed before activities sync, and using it as the newest endpoint would
+// report a spurious ~-100% ramp. Needs at least two real datapoints; returns
+// undefined otherwise (new athlete, gap in syncing, or only today present).
 export function computeWeeklyRampPct(range: WellnessEntry[]): number | undefined {
-  if (range.length === 0) return undefined;
-  const sorted = [...range].sort((a, b) => a.date.localeCompare(b.date));
-  const oldest = sorted[0];
-  const newest = sorted[sorted.length - 1];
-  if (oldest.ctl <= 0) return undefined;
+  const populated = range.filter((e) => e.ctl > 0).sort((a, b) => a.date.localeCompare(b.date));
+  if (populated.length < 2) return undefined;
+  const oldest = populated[0];
+  const newest = populated[populated.length - 1];
   return ((newest.ctl - oldest.ctl) / oldest.ctl) * 100;
 }
 
@@ -155,8 +157,11 @@ export interface PushResult {
 }
 
 // Push every non-rest workout, recording outcomes instead of aborting on the
-// first failure. Re-running is safe — days that landed are locked as existing
-// events and skipped next time — so the caller just needs to know what to retry.
+// first failure. Re-running re-creates a fully-failed day (it stays empty and
+// gets re-planned). CAVEAT — stacked days: when the scheduler co-locates two
+// sessions on one day (e.g. hard ride + weights) and one lands while the other
+// fails, the created event now locks that day, so the failed session is NOT
+// regenerated on re-run. It has to be re-added by hand (see push-week).
 export async function pushPlan(
   intervals: { createEvent: (e: IntervalsEvent) => Promise<unknown> },
   planned: PlannedWorkout[],
@@ -344,7 +349,8 @@ async function main() {
   } else {
     console.log(
       `Created ${created.length}, failed ${failed.length}. ` +
-        `Re-run to retry the failed days — events already created are skipped.`,
+        `Re-run to retry fully-failed days. A failed session on a day that ` +
+        `partially landed won't regenerate — re-add it by hand (see push-week).`,
     );
     process.exitCode = 1;
   }

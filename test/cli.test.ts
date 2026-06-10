@@ -127,6 +127,16 @@ describe("computeWeeklyRampPct", () => {
   it("handles entries arriving in any date order", () => {
     expect(computeWeeklyRampPct([w("2026-04-26", 55), w("2026-04-19", 50)])).toBeCloseTo(10, 5);
   });
+
+  it("ignores today's zeroed entry instead of reporting a spurious -100% ramp", () => {
+    // Today (06-09) is unsynced (ctl 0); ramp should come from the populated days.
+    const range = [w("2026-06-02", 50), w("2026-06-08", 53), w("2026-06-09", 0)];
+    expect(computeWeeklyRampPct(range)).toBeCloseTo(6, 5);
+  });
+
+  it("returns undefined when only one populated datapoint remains", () => {
+    expect(computeWeeklyRampPct([w("2026-06-02", 50), w("2026-06-09", 0)])).toBeUndefined();
+  });
 });
 
 describe("workoutToEvent", () => {

@@ -102,5 +102,23 @@ describe("XertClient", () => {
     it("throws if not authenticated", async () => {
       await expect(client.getTrainingInfo()).rejects.toThrow("Not authenticated");
     });
+
+    it("coerces a malformed 200 body to safe defaults instead of NaN/undefined", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => MOCK_TOKEN_RESPONSE });
+      // 200 with an error-shaped body: no signature, no status/focus, no wotd.
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ error: "no data" }) });
+
+      await client.authenticate();
+      const info = await client.getTrainingInfo();
+
+      expect(info.ftp).toBe(0);
+      expect(info.ltp).toBe(0);
+      expect(info.hie).toBe(0);
+      expect(info.pp).toBe(0);
+      expect(info.training_status).toBe("");
+      expect(info.focus).toBe("");
+      expect(info.wotd_name).toBeUndefined();
+      expect(info.wotd_description).toBeUndefined();
+    });
   });
 });
