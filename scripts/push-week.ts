@@ -16,6 +16,7 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ quiet: true });
 import { promises as fs } from "node:fs";
 import { parse } from "yaml";
+import { toLocalISODate } from "../src/dates.js";
 import { loadConfig } from "../src/config.js";
 import { IntervalsClient } from "../src/intervals.js";
 import type { Config, IntervalsEvent } from "../src/types.js";
@@ -58,7 +59,7 @@ function offsetForDay(day: string | number): number {
 function dateStr(anchor: Date, offset: number): string {
   const d = new Date(anchor);
   d.setDate(d.getDate() + offset);
-  return d.toISOString().slice(0, 10);
+  return toLocalISODate(d);
 }
 
 // Attach optional planned-load targets (TSS / duration / IF) when the session
@@ -99,6 +100,56 @@ function sessionToEvent(s: PlanSession, date: string, config: Config): Intervals
   );
 }
 
+export type PushAction =
+  | { kind: "create"; date: string; event: IntervalsEvent }
+  | { kind: "update"; date: string; event: IntervalsEvent; priorId: number }
+  | { kind: "skip"; date: string; event: IntervalsEvent; reason: string };
+
+// Decide create/update/skip per planned event. Default mode skips any day that
+// already holds an event. --replace consumes existing events one-per-session, so
+// two sessions stacked on one day map to two distinct existing events (or create
+// the overflow) instead of both overwriting the first.
+export function planPushActions(
+  events: IntervalsEvent[],
+  existing: IntervalsEvent[],
+  replace: boolean,
+): PushAction[] {
+  const existingDates = new Set(existing.map((e) => e.start_date_local.slice(0, 10)));
+  const queue = new Map<string, IntervalsEvent[]>();
+  for (const e of existing) {
+    const date = e.start_date_local.slice(0, 10);
+    const arr = queue.get(date) ?? [];
+    arr.push(e);
+    queue.set(date, arr);
+  }
+  const actions: PushAction[] = [];
+  for (const event of events) {
+    const date = event.start_date_local.slice(0, 10);
+    if (!replace) {
+      if (existingDates.has(date)) {
+        actions.push({ kind: "skip", date, event, reason: "day already has an event" });
+      } else {
+        actions.push({ kind: "create", date, event });
+      }
+      continue;
+    }
+    const prior = queue.get(date)?.shift();
+    if (!prior) {
+      actions.push({ kind: "create", date, event });
+    } else if (typeof prior.id !== "number") {
+      actions.push({
+        kind: "skip",
+        date,
+        event,
+        reason: "existing event has no id; cannot replace",
+      });
+    } else {
+      actions.push({ kind: "update", date, event, priorId: prior.id });
+    }
+  }
+  return actions;
+}
+
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
   const replace = process.argv.includes("--replace");
@@ -121,35 +172,26 @@ async function main() {
 
   const client = new IntervalsClient(process.env.INTERVALS_API_KEY!);
   const existing = await client.getEvents(oldest, newest);
-  // First existing event per day — used to skip (default) or update (--replace).
-  const existingByDate = new Map<string, IntervalsEvent>();
-  for (const e of existing) {
-    const date = e.start_date_local.slice(0, 10);
-    if (!existingByDate.has(date)) existingByDate.set(date, e);
-  }
+
+  const actions = planPushActions(events, existing, replace);
 
   console.log(
     `Week anchored to Monday ${anchorStr}${dryRun ? " — DRY RUN" : ""}${replace ? " — REPLACE" : ""}`,
   );
-  for (const e of events) {
-    const date = e.start_date_local.slice(0, 10);
+  for (const action of actions) {
+    const { date, event: e } = action;
     const load = typeof e.icu_training_load === "number" ? `, ${e.icu_training_load} TSS` : "";
-    const prior = existingByDate.get(date);
-    if (prior && !replace) {
-      console.log(`  skip    ${date} — ${e.name} (day already has an event)`);
-      continue;
-    }
-    if (prior && typeof prior.id !== "number") {
-      console.log(`  skip    ${date} — ${e.name} (existing event has no id; cannot replace)`);
+    if (action.kind === "skip") {
+      console.log(`  skip    ${date} — ${e.name} (${action.reason})`);
       continue;
     }
     if (dryRun) {
-      const verb = prior ? "update " : "would  ";
+      const verb = action.kind === "update" ? "update " : "would  ";
       console.log(`  ${verb} ${date} — ${e.name} (${e.type}${load})`);
       continue;
     }
-    if (prior) {
-      await client.updateEvent(prior.id!, e);
+    if (action.kind === "update") {
+      await client.updateEvent(action.priorId, e);
       console.log(`  updated ${date} — ${e.name} (${e.type}${load})`);
     } else {
       await client.createEvent(e);
@@ -159,7 +201,14 @@ async function main() {
   console.log(dryRun ? "Dry run — nothing pushed." : "Done.");
 }
 
-main().catch((err) => {
-  console.error(err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+const isMain =
+  typeof process !== "undefined" &&
+  process.argv[1] != null &&
+  (process.argv[1].endsWith("push-week.ts") || process.argv[1].endsWith("push-week.js"));
+
+if (isMain) {
+  main().catch((err) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}

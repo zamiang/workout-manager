@@ -54,6 +54,37 @@ describe("IntervalsClient", () => {
         "Intervals.icu API error (401)",
       );
     });
+
+    it("coerces malformed events and drops entries with no date", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            id: 1,
+            start_date_local: "2026-04-20",
+            name: "Ride",
+            category: "WORKOUT",
+            type: "Ride",
+          },
+          { name: "no date — should be dropped", category: "WORKOUT" },
+          { id: "not-a-number", start_date_local: "2026-04-21", category: "RACE_A" },
+        ],
+      });
+
+      const events = await client.getEvents("2026-04-20", "2026-04-26");
+
+      expect(events).toHaveLength(2);
+      expect(events[0].start_date_local).toBe("2026-04-20");
+      expect(events[1]).toMatchObject({ start_date_local: "2026-04-21", category: "RACE_A" });
+      expect(events[1].id).toBeUndefined(); // non-numeric id coerced away
+      expect(events[1].name).toBe(""); // missing name coerced to ""
+    });
+
+    it("returns empty array when the response is not an array", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ error: "boom" }) });
+      const events = await client.getEvents("2026-04-20", "2026-04-26");
+      expect(events).toEqual([]);
+    });
   });
 
   describe("getTrainingLoad", () => {

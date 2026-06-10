@@ -53,7 +53,7 @@ export interface IntervalsEvent {
   id?: number;
   start_date_local: string; // we write YYYY-MM-DD; the API returns it with a time component (e.g. "2026-04-21T00:00:00") on read — normalize before comparing
   name: string;
-  category: string; // "WORKOUT", "NOTE", etc.
+  category?: string; // "WORKOUT", "NOTE", "RACE_A", etc. (read for race detection)
   description?: string;
   type?: string; // "Ride", "WeightTraining", etc.
   // Planned-load targets. When set, Intervals.icu shows the workout's target

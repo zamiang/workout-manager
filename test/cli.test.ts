@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   parseArgs,
   formatPlan,
@@ -6,6 +6,8 @@ import {
   computeWeeklyRampPct,
   resolveRaceDate,
   weeksUntil,
+  latestTrainingLoad,
+  pushPlan,
 } from "../src/cli.js";
 import type { PlannedWorkout, WellnessEntry, IntervalsEvent } from "../src/types.js";
 
@@ -124,6 +126,16 @@ describe("computeWeeklyRampPct", () => {
 
   it("handles entries arriving in any date order", () => {
     expect(computeWeeklyRampPct([w("2026-04-26", 55), w("2026-04-19", 50)])).toBeCloseTo(10, 5);
+  });
+
+  it("ignores today's zeroed entry instead of reporting a spurious -100% ramp", () => {
+    // Today (06-09) is unsynced (ctl 0); ramp should come from the populated days.
+    const range = [w("2026-06-02", 50), w("2026-06-08", 53), w("2026-06-09", 0)];
+    expect(computeWeeklyRampPct(range)).toBeCloseTo(6, 5);
+  });
+
+  it("returns undefined when only one populated datapoint remains", () => {
+    expect(computeWeeklyRampPct([w("2026-06-02", 50), w("2026-06-09", 0)])).toBeUndefined();
   });
 });
 
@@ -254,5 +266,67 @@ describe("weeksUntil", () => {
     expect(weeksUntil("2026-06-09", "2026-06-09")).toBe(0);
     expect(weeksUntil("2026-06-09", "2026-06-10")).toBe(1);
     expect(weeksUntil("2026-06-09", "2026-09-26")).toBe(16);
+  });
+});
+
+describe("latestTrainingLoad", () => {
+  it("picks the most recent entry with a populated CTL", () => {
+    const range: WellnessEntry[] = [
+      { date: "2026-06-07", ctl: 55, atl: 60, tsb: -5 },
+      { date: "2026-06-08", ctl: 56, atl: 58, tsb: -2 },
+      { date: "2026-06-09", ctl: 0, atl: 0, tsb: 0 }, // today, not computed yet
+    ];
+    expect(latestTrainingLoad(range)).toEqual({ ctl: 56, atl: 58, tsb: -2 });
+  });
+
+  it("returns zeros when nothing is populated", () => {
+    expect(latestTrainingLoad([{ date: "2026-06-09", ctl: 0, atl: 0, tsb: 0 }])).toEqual({
+      ctl: 0,
+      atl: 0,
+      tsb: 0,
+    });
+  });
+
+  it("returns zeros for an empty range", () => {
+    expect(latestTrainingLoad([])).toEqual({ ctl: 0, atl: 0, tsb: 0 });
+  });
+});
+
+describe("pushPlan", () => {
+  const plan: PlannedWorkout[] = [
+    {
+      date: "2026-06-08",
+      type: "cycling",
+      name: "Easy Ride",
+      description: "z2",
+      intensity: "easy",
+    },
+    { date: "2026-06-09", type: "rest", name: "Rest Day", description: "off", intensity: "easy" },
+    {
+      date: "2026-06-10",
+      type: "weights",
+      name: "Strength",
+      description: "lift",
+      intensity: "hard",
+    },
+  ];
+
+  it("skips rest days and pushes the rest", async () => {
+    const createEvent = vi.fn().mockResolvedValue({});
+    const result = await pushPlan({ createEvent }, plan, () => {});
+    expect(createEvent).toHaveBeenCalledTimes(2); // rest day skipped
+    expect(result.created).toHaveLength(2);
+    expect(result.failed).toHaveLength(0);
+  });
+
+  it("records failures and keeps going", async () => {
+    const createEvent = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("503 boom"))
+      .mockResolvedValueOnce({});
+    const result = await pushPlan({ createEvent }, plan, () => {});
+    expect(createEvent).toHaveBeenCalledTimes(2);
+    expect(result.created).toHaveLength(1);
+    expect(result.failed).toEqual([{ date: "2026-06-08", name: "Easy Ride", error: "503 boom" }]);
   });
 });

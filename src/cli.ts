@@ -4,8 +4,15 @@ import { loadConfig } from "./config.js";
 import { IntervalsClient } from "./intervals.js";
 import { XertClient } from "./xert.js";
 import { schedule, classifyFatigue, rampGuardTriggered } from "./scheduler.js";
+import { todayLocal, addLocalDays } from "./dates.js";
 import { computeDistribution, POLARIZED_TARGETS, ZONES, zoneLabel } from "./zones.js";
-import type { PlannedWorkout, IntervalsEvent, WellnessEntry, WorkoutType } from "./types.js";
+import type {
+  PlannedWorkout,
+  IntervalsEvent,
+  WellnessEntry,
+  WorkoutType,
+  TrainingLoad,
+} from "./types.js";
 
 // Earliest future A-priority race date (YYYY-MM-DD) from calendar events, else
 // the configured race_date fallback, else undefined when no race is known.
@@ -33,15 +40,27 @@ export function weeksUntil(today: string, raceDate: string): number {
   return Math.ceil(diff / (7 * dayMs));
 }
 
-// CTL ramp = (today - 7d ago) / (7d ago) * 100. Returns undefined when the
-// 7-day-ago wellness entry is missing or zero (new athlete, gap in syncing).
+// CTL ramp = (newest - oldest) / oldest * 100 over the populated wellness days.
+// Entries with ctl <= 0 are dropped first — Intervals.icu may return today's
+// entry zeroed before activities sync, and using it as the newest endpoint would
+// report a spurious ~-100% ramp. Needs at least two real datapoints; returns
+// undefined otherwise (new athlete, gap in syncing, or only today present).
 export function computeWeeklyRampPct(range: WellnessEntry[]): number | undefined {
-  if (range.length === 0) return undefined;
-  const sorted = [...range].sort((a, b) => a.date.localeCompare(b.date));
-  const oldest = sorted[0];
-  const newest = sorted[sorted.length - 1];
-  if (oldest.ctl <= 0) return undefined;
+  const populated = range.filter((e) => e.ctl > 0).sort((a, b) => a.date.localeCompare(b.date));
+  if (populated.length < 2) return undefined;
+  const oldest = populated[0];
+  const newest = populated[populated.length - 1];
   return ((newest.ctl - oldest.ctl) / oldest.ctl) * 100;
+}
+
+// Most recent wellness entry with a populated CTL. Intervals.icu may return
+// today's entry with CTL 0 before activities sync, so reading a single day can
+// silently report zero fitness — fall back to the last day that actually has data.
+export function latestTrainingLoad(range: WellnessEntry[]): TrainingLoad {
+  const populated = range.filter((e) => e.ctl > 0).sort((a, b) => a.date.localeCompare(b.date));
+  const pick = populated[populated.length - 1];
+  if (!pick) return { ctl: 0, atl: 0, tsb: 0 };
+  return { ctl: pick.ctl, atl: pick.atl, tsb: pick.tsb };
 }
 
 export type Command = "plan" | "status" | "check";
@@ -132,8 +151,41 @@ export function workoutToEvent(w: PlannedWorkout): IntervalsEvent {
   return event;
 }
 
+export interface PushResult {
+  created: string[];
+  failed: { date: string; name: string; error: string }[];
+}
+
+// Push every non-rest workout, recording outcomes instead of aborting on the
+// first failure. Re-running re-creates a fully-failed day (it stays empty and
+// gets re-planned). CAVEAT — stacked days: when the scheduler co-locates two
+// sessions on one day (e.g. hard ride + weights) and one lands while the other
+// fails, the created event now locks that day, so the failed session is NOT
+// regenerated on re-run. It has to be re-added by hand (see push-week).
+export async function pushPlan(
+  intervals: { createEvent: (e: IntervalsEvent) => Promise<unknown> },
+  planned: PlannedWorkout[],
+  log: (msg: string) => void = console.log,
+): Promise<PushResult> {
+  const created: string[] = [];
+  const failed: PushResult["failed"] = [];
+  for (const w of planned) {
+    if (w.type === "rest") continue; // don't push rest days
+    try {
+      await intervals.createEvent(workoutToEvent(w));
+      created.push(`${w.date} — ${w.name}`);
+      log(`  Created: ${w.date} — ${w.name}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      failed.push({ date: w.date, name: w.name, error: msg });
+      log(`  FAILED:  ${w.date} — ${w.name} — ${msg}`);
+    }
+  }
+  return { created, failed };
+}
+
 async function runCheck(intervals: IntervalsClient, xert: XertClient): Promise<number> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   let failures = 0;
   const step = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
     try {
@@ -174,20 +226,16 @@ async function main() {
 
   if (command === "status") {
     await xert.authenticate();
-    const today = new Date().toISOString().slice(0, 10);
-    const lookbackStart = new Date();
-    lookbackStart.setDate(lookbackStart.getDate() - 28);
-    const lookbackStr = lookbackStart.toISOString().slice(0, 10);
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+    const today = todayLocal();
+    const lookbackStr = addLocalDays(today, -28);
+    const weekAgoStr = addLocalDays(today, -7);
 
-    const [load, info, activities, wellnessRange] = await Promise.all([
-      intervals.getTrainingLoad(today),
+    const [info, activities, wellnessRange] = await Promise.all([
       xert.getTrainingInfo(),
       intervals.getActivities(lookbackStr, today),
       intervals.getTrainingLoadRange(weekAgoStr, today),
     ]);
+    const load = latestTrainingLoad(wellnessRange);
     const distribution = computeDistribution(activities);
     const rampRatePct = computeWeeklyRampPct(wellnessRange);
 
@@ -225,28 +273,20 @@ async function main() {
 
   // plan command
   await xert.authenticate();
-  const today = new Date().toISOString().slice(0, 10);
-  const endDate = new Date();
-  endDate.setDate(endDate.getDate() + 6);
-  const endStr = endDate.toISOString().slice(0, 10);
-  const raceHorizon = new Date();
-  raceHorizon.setDate(raceHorizon.getDate() + 364);
-  const raceHorizonStr = raceHorizon.toISOString().slice(0, 10);
-  const lookbackStart = new Date();
-  lookbackStart.setDate(lookbackStart.getDate() - 28);
-  const lookbackStr = lookbackStart.toISOString().slice(0, 10);
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const weekAgoStr = weekAgo.toISOString().slice(0, 10);
+  const today = todayLocal();
+  const endStr = addLocalDays(today, 6);
+  const raceHorizonStr = addLocalDays(today, 364);
+  const lookbackStr = addLocalDays(today, -28);
+  const weekAgoStr = addLocalDays(today, -7);
 
-  const [events, load, info, activities, wellnessRange, raceEvents] = await Promise.all([
+  const [events, info, activities, wellnessRange, raceEvents] = await Promise.all([
     intervals.getEvents(today, endStr),
-    intervals.getTrainingLoad(today),
     xert.getTrainingInfo(),
     intervals.getActivities(lookbackStr, today),
     intervals.getTrainingLoadRange(weekAgoStr, today),
     intervals.getEvents(today, raceHorizonStr),
   ]);
+  const load = latestTrainingLoad(wellnessRange);
 
   const zoneDistribution = computeDistribution(activities);
   const rampRatePct = computeWeeklyRampPct(wellnessRange);
@@ -303,13 +343,17 @@ async function main() {
   }
 
   console.log("Pushing to Intervals.icu...");
-  for (const w of planned) {
-    if (w.type === "rest") continue; // don't push rest days
-    const event = workoutToEvent(w);
-    await intervals.createEvent(event);
-    console.log(`  Created: ${w.date} — ${w.name}`);
+  const { created, failed } = await pushPlan(intervals, planned);
+  if (failed.length === 0) {
+    console.log(`Done. Created ${created.length} event(s).`);
+  } else {
+    console.log(
+      `Created ${created.length}, failed ${failed.length}. ` +
+        `Re-run to retry fully-failed days. A failed session on a day that ` +
+        `partially landed won't regenerate — re-add it by hand (see push-week).`,
+    );
+    process.exitCode = 1;
   }
-  console.log("Done.");
 }
 
 // Only run main when executed directly (not when imported by tests)

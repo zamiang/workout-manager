@@ -21,6 +21,23 @@ function parseWellnessEntry(raw: unknown): TrainingLoad {
   };
 }
 
+function parseEvent(raw: unknown): IntervalsEvent | null {
+  if (!raw || typeof raw !== "object") return null;
+  const e = raw as Record<string, unknown>;
+  if (typeof e.start_date_local !== "string" || e.start_date_local === "") return null;
+  return {
+    ...(typeof e.id === "number" ? { id: e.id } : {}),
+    start_date_local: e.start_date_local,
+    name: typeof e.name === "string" ? e.name : "",
+    ...(typeof e.category === "string" ? { category: e.category } : {}),
+    ...(typeof e.description === "string" ? { description: e.description } : {}),
+    ...(typeof e.type === "string" ? { type: e.type } : {}),
+    ...(typeof e.icu_training_load === "number" ? { icu_training_load: e.icu_training_load } : {}),
+    ...(typeof e.moving_time === "number" ? { moving_time: e.moving_time } : {}),
+    ...(typeof e.icu_intensity === "number" ? { icu_intensity: e.icu_intensity } : {}),
+  };
+}
+
 export class IntervalsClient {
   private headers: Record<string, string>;
   private fetch: FetchFn;
@@ -40,7 +57,9 @@ export class IntervalsClient {
     if (!res.ok) {
       throw new Error(`Intervals.icu API error (${res.status}): ${await res.text()}`);
     }
-    return res.json();
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+    return data.map(parseEvent).filter((e): e is IntervalsEvent => e !== null);
   }
 
   async getTrainingLoadRange(oldest: string, newest: string): Promise<WellnessEntry[]> {
