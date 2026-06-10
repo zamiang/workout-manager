@@ -152,6 +152,14 @@ describe("schedule", () => {
     expect(onLockedDay).toHaveLength(0);
   });
 
+  it("locks days from completedDates that carry a time suffix", () => {
+    // completedDates normally arrives pre-trimmed from the CLI, but the
+    // scheduler normalizes it too — prove the timestamp path locks its day.
+    const result = schedule(makeInput({ completedDates: ["2026-04-21T00:00:00"] }));
+    const onLockedDay = result.filter((w) => w.date === "2026-04-21");
+    expect(onLockedDay).toHaveLength(0);
+  });
+
   it("schedules easy rides when fatigued (low TSB)", () => {
     const result = schedule(
       makeInput({
