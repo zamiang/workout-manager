@@ -219,6 +219,12 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     phaseWeightSessions(phase, weeksToRace, config),
     fatigueSessions,
   );
+  // Strength sessions already on this week's calendar consume the quota;
+  // pre-window ones only constrain spacing, not the count.
+  const weightSessionsRemaining = Math.max(
+    0,
+    weightSessionsTarget - existingWeightDays.filter((i) => i >= 0).length,
+  );
 
   // Each day can hold multiple workouts (hard cycling + weights = one stacked
   // training day, two PlannedWorkout entries).
@@ -227,8 +233,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     existingHardDays.has(idx) ||
     (idx >= 0 && idx < days && plan[idx].some((w) => isHard(w.type, w.intensity)));
   const isEmpty = (idx: number): boolean => plan[idx].length === 0;
-  const wouldCreateBackToBack = (idx: number): boolean =>
-    isHardDay(idx - 1) || isHardDay(idx + 1);
+  const wouldCreateBackToBack = (idx: number): boolean => isHardDay(idx - 1) || isHardDay(idx + 1);
   const respectsWeightGap = (idx: number, slots: number[]): boolean =>
     [...slots, ...existingWeightDays].every(
       (s) => Math.abs(idx - s) >= scheduling.min_weight_gap_days,
@@ -245,9 +250,10 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     });
   }
 
-  // Phase 1: sweet-spot (mid-week), unless very fatigued.
+  // Phase 1: sweet-spot (mid-week), unless very fatigued or the calendar
+  // already holds one this week.
   let lcIdx: number | undefined;
-  if (!veryFatigued) {
+  if (!veryFatigued && existingSweetSpots === 0) {
     const lcCandidates = available.filter((i) => isEmpty(i) && !wouldCreateBackToBack(i));
     lcIdx = lcCandidates.find((i) => i >= 2 && i <= 4) ?? lcCandidates[0];
     if (lcIdx !== undefined) {
@@ -267,7 +273,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const hardCyclingTargets = new Set<number>();
   if (intensity === "hard") {
     for (const i of available) {
-      if (hardCyclingTargets.size >= scheduling.hard_cycling_days) break;
+      if (hardCyclingTargets.size + existingHardRides >= scheduling.hard_cycling_days) break;
       if (!isEmpty(i)) continue;
       if (wouldCreateBackToBack(i)) continue;
       // Spacing: hard cycling days follow min_weight_gap_days from each other
@@ -298,12 +304,12 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
       ].sort((a, b) => a - b)
     : [];
   for (const i of hardStackOrder) {
-    if (weightSlots.length >= weightSessionsTarget) break;
+    if (weightSlots.length >= weightSessionsRemaining) break;
     if (!respectsWeightGap(i, weightSlots)) continue;
     weightSlots.push(i);
   }
 
-  if (weightSlots.length < weightSessionsTarget) {
+  if (weightSlots.length < weightSessionsRemaining) {
     // Overflow: find additional days for weights. Candidates are empty days
     // (plus hard-cycling target days that weren't picked above, but those are
     // already "full" from our POV). Very_fatigued prefers mid-week.
@@ -316,7 +322,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
         })
       : overflowCandidates;
     for (const i of ordered) {
-      if (weightSlots.length >= weightSessionsTarget) break;
+      if (weightSlots.length >= weightSessionsRemaining) break;
       if (wouldCreateBackToBack(i)) continue;
       if (!respectsWeightGap(i, weightSlots)) continue;
       weightSlots.push(i);
@@ -339,8 +345,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   // case we still try to find a second rest for recovery from the weights.
   const restCandidates = available.filter((i) => isEmpty(i));
   const restIdx =
-    restCandidates.find((i) => i > 0 && isHardDay(i - 1)) ??
-    restCandidates[restCandidates.length - 1];
+    restCandidates.find((i) => isHardDay(i - 1)) ?? restCandidates[restCandidates.length - 1];
   if (restIdx !== undefined) {
     plan[restIdx].push({
       date: dates[restIdx],

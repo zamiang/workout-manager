@@ -278,9 +278,18 @@ async function main() {
   const raceHorizonStr = addLocalDays(today, 364);
   const lookbackStr = addLocalDays(today, -28);
   const weekAgoStr = addLocalDays(today, -7);
+  // Fetch events from just before the window too: a hard session yesterday
+  // must block a hard placement today (back-to-back) and a strength session
+  // within min_weight_gap_days must push this week's first one out. The
+  // scheduler gives pre-window events a negative day index — they constrain
+  // spacing without locking any window day or consuming weekly quotas.
+  const eventLookbackStr = addLocalDays(
+    today,
+    -Math.max(1, config.scheduling.min_weight_gap_days - 1),
+  );
 
   const [events, info, activities, wellnessRange, raceEvents] = await Promise.all([
-    intervals.getEvents(today, endStr),
+    intervals.getEvents(eventLookbackStr, endStr),
     xert.getTrainingInfo(),
     intervals.getActivities(lookbackStr, today),
     intervals.getTrainingLoadRange(weekAgoStr, today),

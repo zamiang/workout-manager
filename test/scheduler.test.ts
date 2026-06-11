@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   schedule,
   classifyFatigue,
+  classifyExistingEvent,
   rampGuardTriggered,
   classifyPhase,
   phaseWeightSessions,
@@ -694,5 +695,196 @@ describe("schedule", () => {
         expect(w.load).toBeUndefined();
       }
     });
+  });
+
+  describe("existing-event constraint seeding", () => {
+    // Locked days must not be invisible: events already on the calendar count
+    // toward the sweet-spot quota, back-to-back hard spacing, and the weekly
+    // weight-session count/gap.
+    const ev = (
+      date: string,
+      name: string,
+      type = "Ride",
+      extra: Partial<IntervalsEvent> = {},
+    ): IntervalsEvent => ({
+      id: 1,
+      start_date_local: `${date}T00:00:00`,
+      name,
+      category: "WORKOUT",
+      type,
+      ...extra,
+    });
+    const freshLoad = { ctl: 50, atl: 40, tsb: 10 };
+
+    it("an existing sweet-spot event suppresses the planner's own sweet-spot", () => {
+      const result = schedule(
+        makeInput({ existingEvents: [ev("2026-04-24", "Sweet Spot Intervals")] }),
+      );
+      expect(result.filter((w) => w.type === "sweet_spot")).toHaveLength(0);
+    });
+
+    it("an existing hard event blocks hard placement on adjacent days and fills the hard-ride quota", () => {
+      // Hard interval ride already on Thu (idx 3): Wed and Fri must stay easy,
+      // and the existing ride consumes the hard_cycling_days budget (1).
+      const result = schedule(
+        makeInput({
+          trainingLoad: freshLoad,
+          existingEvents: [ev("2026-04-23", "VO2max Intervals")],
+        }),
+      );
+      const hardOn = (date: string) => result.filter((w) => w.date === date && isHardEntry(w));
+      expect(hardOn("2026-04-22")).toHaveLength(0);
+      expect(hardOn("2026-04-24")).toHaveLength(0);
+      const hardRides = result.filter((w) => w.type === "cycling" && w.intensity === "hard");
+      expect(hardRides).toHaveLength(0);
+    });
+
+    it("existing weight sessions count toward weight_sessions", () => {
+      const result = schedule(
+        makeInput({
+          existingEvents: [
+            ev("2026-04-21", "Cyclist Strength Routine", "WeightTraining"),
+            ev("2026-04-25", "Cyclist Strength Routine", "WeightTraining"),
+          ],
+        }),
+      );
+      expect(result.filter((w) => w.type === "weights")).toHaveLength(0);
+    });
+
+    it("a new weight session honors min_weight_gap_days from an existing one", () => {
+      const result = schedule(
+        makeInput({
+          existingEvents: [ev("2026-04-22", "Cyclist Strength Routine", "WeightTraining")],
+        }),
+      );
+      const weights = result.filter((w) => w.type === "weights");
+      expect(weights).toHaveLength(1); // quota 2, one already on the calendar
+      // ≥ 2 days from the existing Wed session → not Tue/Wed/Thu.
+      expect(["2026-04-21", "2026-04-22", "2026-04-23"]).not.toContain(weights[0].date);
+    });
+
+    it("a hard event the day before the window blocks day-0 hard placement", () => {
+      const result = schedule(
+        makeInput({
+          trainingLoad: freshLoad,
+          existingEvents: [ev("2026-04-19", "Sweet Spot Intervals")],
+        }),
+      );
+      const day0 = result.filter((w) => w.date === "2026-04-20");
+      expect(day0.length).toBeGreaterThan(0); // day 0 isn't locked, just kept easy
+      expect(day0.filter(isHardEntry)).toHaveLength(0);
+      // Pre-window events don't consume this week's quota.
+      expect(result.filter((w) => w.type === "sweet_spot")).toHaveLength(1);
+    });
+
+    it("a weight session just before the window pushes this week's first one out, without consuming quota", () => {
+      const result = schedule(
+        makeInput({
+          existingEvents: [ev("2026-04-19", "Cyclist Strength Routine", "WeightTraining")],
+        }),
+      );
+      const weights = result.filter((w) => w.type === "weights");
+      expect(weights).toHaveLength(2);
+      expect(weights.map((w) => w.date)).not.toContain("2026-04-20");
+    });
+
+    it("existing easy rides lock their day but block nothing else", () => {
+      const result = schedule(
+        makeInput({
+          existingEvents: [ev("2026-04-23", "Easy Ride", "Ride", { icu_intensity: 0.62 })],
+        }),
+      );
+      expect(result.filter((w) => w.type === "sweet_spot")).toHaveLength(1);
+      expect(result.filter((w) => w.type === "weights")).toHaveLength(2);
+    });
+
+    it("regression 2026-06-11: does not stack a hard day between existing strength and sweet-spot events", () => {
+      // Observed failure: calendar held Strength Wed 6/10, Sweet Spot Fri 6/12,
+      // Strength Sun 6/14 — the planner proposed Sweet Spot + Strength on Thu
+      // 6/11, creating three consecutive hard days, a second weekly sweet-spot,
+      // and a third weekly strength session.
+      const result = schedule(
+        makeInput({
+          startDate: "2026-06-11",
+          existingEvents: [
+            ev("2026-06-10", "Cyclist Strength Routine", "WeightTraining"),
+            ev("2026-06-12", "Sweet Spot Intervals"),
+            ev("2026-06-14", "Cyclist Strength Routine", "WeightTraining"),
+          ],
+        }),
+      );
+      // Thu 6/11 sits between two existing hard days — nothing hard goes there.
+      expect(result.filter((w) => w.date === "2026-06-11" && isHardEntry(w))).toHaveLength(0);
+      // The Fri sweet-spot fills the weekly quota.
+      expect(result.filter((w) => w.type === "sweet_spot")).toHaveLength(0);
+      // Sun's strength counts toward weight_sessions (2) — at most one more,
+      // spaced ≥ min_weight_gap_days from 6/14 and clear of adjacent hard days.
+      const weights = result.filter((w) => w.type === "weights");
+      expect(weights.length).toBeLessThanOrEqual(1);
+      for (const w of weights) {
+        expect(["2026-06-16", "2026-06-17"]).toContain(w.date);
+      }
+      // No back-to-back hard days across existing + planned events combined.
+      const hardDates = [
+        "2026-06-10",
+        "2026-06-12",
+        "2026-06-14",
+        ...result.filter(isHardEntry).map((w) => w.date),
+      ];
+      const sorted = [...new Set(hardDates)].sort();
+      for (let i = 1; i < sorted.length; i++) {
+        const diff =
+          (new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 86_400_000;
+        expect(diff).toBeGreaterThanOrEqual(2);
+      }
+    });
+  });
+});
+
+describe("classifyExistingEvent", () => {
+  const ev = (overrides: Partial<IntervalsEvent>): IntervalsEvent => ({
+    start_date_local: "2026-04-20T00:00:00",
+    name: "Workout",
+    category: "WORKOUT",
+    ...overrides,
+  });
+
+  it("classifies WeightTraining type and strength-named events as weights", () => {
+    expect(classifyExistingEvent(ev({ type: "WeightTraining", name: "Lift" }))).toBe("weights");
+    expect(classifyExistingEvent(ev({ type: "Ride", name: "Cyclist Strength Routine" }))).toBe(
+      "weights",
+    );
+  });
+
+  it("classifies sweet-spot by name (before the generic interval pattern)", () => {
+    expect(classifyExistingEvent(ev({ name: "Sweet Spot Intervals" }))).toBe("sweet_spot");
+  });
+
+  it("classifies hard interval names as hard_cycling", () => {
+    expect(classifyExistingEvent(ev({ name: "VO2max Repeats" }))).toBe("hard_cycling");
+    expect(classifyExistingEvent(ev({ name: "Threshold 2x20" }))).toBe("hard_cycling");
+  });
+
+  it("classifies races as hard_cycling", () => {
+    expect(classifyExistingEvent(ev({ category: "RACE_A", name: "Gravel Century" }))).toBe(
+      "hard_cycling",
+    );
+  });
+
+  it("classifies easy/endurance/long names as easy", () => {
+    expect(classifyExistingEvent(ev({ name: "Easy Ride" }))).toBe("easy");
+    expect(classifyExistingEvent(ev({ name: "Long Endurance Ride" }))).toBe("easy");
+  });
+
+  it("falls back to planned IF for arbitrary names", () => {
+    expect(classifyExistingEvent(ev({ name: "Iron Lung", icu_intensity: 0.88 }))).toBe(
+      "hard_cycling",
+    );
+    expect(classifyExistingEvent(ev({ name: "Coffee Spin", icu_intensity: 0.6 }))).toBe("easy");
+  });
+
+  it("treats notes and unrecognized events as other", () => {
+    expect(classifyExistingEvent(ev({ category: "NOTE", name: "Rest Day" }))).toBe("other");
+    expect(classifyExistingEvent(ev({ name: "Group Ride" }))).toBe("other");
   });
 });
