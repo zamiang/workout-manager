@@ -95,7 +95,11 @@ export function classifyExistingEvent(e: IntervalsEvent): ExistingEventKind {
   }
   if (/easy|endurance|recovery|long|zone ?2|\bz2\b/i.test(e.name)) return "easy";
   if (typeof e.icu_intensity === "number") {
-    return e.icu_intensity >= 0.8 ? "hard_cycling" : "easy";
+    // Bands mirror classifyByIF/HARD_ZONES in zones.ts: sweet spot is
+    // 0.83 < IF <= 0.93; threshold and above is hard; tempo and below is easy.
+    if (e.icu_intensity > 0.93) return "hard_cycling";
+    if (e.icu_intensity > 0.83) return "sweet_spot";
+    return "easy";
   }
   return "other";
 }
