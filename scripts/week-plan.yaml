@@ -11,56 +11,56 @@
 # Preview without writing to Intervals.icu with --dry-run. Days that already
 # have a calendar event are skipped so re-running never duplicates.
 
-# Absorption week. Tuesday's low-cadence session ran long outdoors (149 TSS vs.
-# the ~70 planned), landing on three straight 580-710 TSS weeks and a +12 CTL
-# ramp since mid-May. The rest of the week is trimmed to let this land near
-# ~350 TSS total — the first sub-600 week since the May 11 recovery week.
-# `load` is planned TSS pushed to Intervals.icu; `minutes` and `intensity`
-# (IF) are pushed as the planned duration and intensity factor.
+# Week of 2026-06-15 — controlled rebuild after the absorption week.
+# Mon (Easy) and Tue (3h Long Endurance) are already on the calendar and are
+# skipped by push-week. This file fills Wed-Sun: one stacked quality day
+# (sweet-spot + strength, per the polarized-stacking rule), a full rest day
+# after it, a second aerobic touch Saturday, and the second strength session
+# Sunday (3-day gap from Thursday). Friday is deliberately left empty = rest.
+# Planned week ≈ 374 TSS — just under CTL-maintenance (~418) coming off the
+# sub-600 absorption week, well inside the 7% ramp guard.
 
 sessions:
-  - day: Tue
-    workout: sweet_spot
-    # Already completed as a 149-TSS outdoor ride; this entry is skipped if the
-    # day already has an event. For future weeks, keep it indoor: ~60 min,
-    # sweet-spot blocks with easy recovery spins between.
-    load: 70
-    minutes: 60
-    intensity: 0.85
-
   - day: Wed
     name: Easy Z2 Ride
     type: Ride
-    load: 40
-    minutes: 50
+    load: 48
+    minutes: 75
     intensity: 0.62
     description: >
-      Easy Zone 2 endurance ride, ~50 min. Conversational power/HR. Pure
-      recovery spin — flush the legs after Tuesday's big day.
+      Easy Zone 2 endurance ride, ~75 min. Conversational power/HR
+      (~160W at 260 FTP). Spin the legs out after Tuesday's long ride;
+      tomorrow is the week's quality day.
+
+  - day: Thu
+    # Replaced the planned sweet-spot session with an indoor FTP test (pushed
+    # 2026-06-11 via --replace): Xert estimates threshold ~237 W vs the 260 W
+    # the config assumes, so recalibrate before doing more sweet-spot work.
+    name: FTP Test (Indoor)
+    type: Ride
+    load: 76
+    minutes: 60
+    intensity: 0.87
+    description: >
+      Indoor FTP test on the trainer — 20-min protocol or ramp test (pick one
+      and reuse it). Update FTP in Intervals.icu and config.yaml afterwards.
 
   - day: Thu
     workout: weight_training
+    # Stacked quality day: intervals first on fresh legs, lift after.
+    # Concentrating the stress here keeps Friday a true recovery day.
 
-  - day: Fri
-    name: Easy Z2 Ride (optional)
-    type: Ride
-    load: 30
-    minutes: 40
-    intensity: 0.62
-    description: >
-      Easy Zone 2, ~40 min, or rest. HRV gate: if morning HRV is still
-      depressed (<~50) or resting HR elevated, take this as a rest day.
+  # Fri intentionally empty — full rest day after the stacked quality day.
 
   - day: Sat
     name: Endurance Z2 Ride
     type: Ride
-    load: 75
+    load: 74
     minutes: 105
     intensity: 0.65
     description: >
-      Longer easy Zone 2 ride, ~90-105 min. The week's one real aerobic
-      touch — strictly aerobic, no surges. Fuel ~60 g carb/hr. HRV gate:
-      trim to ~60 min if recovery is still lagging.
+      Steady Zone 2 endurance ride, ~105 min. Strictly aerobic, no surges.
+      Practice century fueling: ~60-90 g carb/hr from the first 30 min.
 
   - day: Sun
     workout: weight_training

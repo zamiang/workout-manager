@@ -17,6 +17,7 @@ function ride(overrides: Partial<Activity> = {}): Activity {
     icu_training_load: 50,
     icu_intensity: 0.7,
     icu_zone_times: null,
+    icu_ss_time: null,
     ...overrides,
   };
 }
@@ -50,10 +51,39 @@ describe("classifyActivity", () => {
     );
   });
 
+  it("ignores the SS bucket when an ordinary zone dominates", () => {
+    // Z2-dominant endurance ride that still logged some sweet-spot seconds.
+    expect(
+      classifyActivity(
+        ride({
+          icu_zone_times: [758, 5400, 600, 400, 120, 60, 53],
+          icu_ss_time: 1260,
+          icu_intensity: 0.65,
+        }),
+      ),
+    ).toBe("endurance");
+  });
+
+  it("prefers the SS bucket when it outweighs every individual zone", () => {
+    // Sweet-spot session: time straddles Z3/Z4 so neither bucket dominates,
+    // but the overlapping SS bucket holds more than either.
+    expect(
+      classifyActivity(
+        ride({
+          icu_zone_times: [300, 600, 900, 800, 100, 0, 0],
+          icu_ss_time: 1500,
+          icu_intensity: 0.89,
+        }),
+      ),
+    ).toBe("sweet_spot");
+  });
+
   it("falls back to IF banding when zone_times is absent", () => {
     expect(classifyActivity(ride({ icu_intensity: 0.7 }))).toBe("endurance");
     expect(classifyActivity(ride({ icu_intensity: 0.8 }))).toBe("tempo");
     expect(classifyActivity(ride({ icu_intensity: 0.9 }))).toBe("sweet_spot");
+    // 89.3% from the API arrives here as 0.893 after client normalization
+    expect(classifyActivity(ride({ icu_intensity: 0.893 }))).toBe("sweet_spot");
     expect(classifyActivity(ride({ icu_intensity: 1.0 }))).toBe("threshold");
     expect(classifyActivity(ride({ icu_intensity: 1.1 }))).toBe("vo2");
     expect(classifyActivity(ride({ icu_intensity: 1.3 }))).toBe("anaerobic");

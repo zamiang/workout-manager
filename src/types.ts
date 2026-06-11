@@ -78,8 +78,9 @@ export interface Activity {
   start_date_local: string; // ISO timestamp from the API; we don't trim it
   type: string; // "Ride", "VirtualRide", "Run", etc.
   icu_training_load: number; // TSS
-  icu_intensity: number | null; // IF, when available (null for non-power activities)
-  icu_zone_times: number[] | null; // seconds in each power zone, when available
+  icu_intensity: number | null; // IF as a fraction, e.g. 0.89 (the API returns a percentage; normalized on read)
+  icu_zone_times: number[] | null; // seconds in Z1..Z7 (normalized from the API's object form on read)
+  icu_ss_time: number | null; // seconds in the native sweet-spot ("SS") band; overlaps Z3/Z4, so not part of icu_zone_times
 }
 
 // --- Xert ---
