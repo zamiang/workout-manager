@@ -189,9 +189,44 @@ describe("IntervalsClient", () => {
         icu_training_load: 78,
         icu_intensity: 0.82,
         icu_zone_times: [600, 1200, 1800, 600, 0, 0, 0],
+        icu_ss_time: null,
       });
       expect(activities[1].icu_intensity).toBeNull();
       expect(activities[1].icu_zone_times).toBeNull();
+      expect(activities[1].icu_ss_time).toBeNull();
+    });
+
+    it("normalizes the live API shape: percent IF and object-array zone times", async () => {
+      // Real response shape observed 2026-06-11: icu_intensity is a percentage
+      // and icu_zone_times is [{id, secs}, ...] with a native "SS" bucket.
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          {
+            id: "i20001",
+            start_date_local: "2026-06-09T08:00:00",
+            type: "Ride",
+            icu_training_load: 65,
+            icu_intensity: 89.3,
+            icu_zone_times: [
+              { id: "Z1", secs: 758 },
+              { id: "Z2", secs: 5400 },
+              { id: "Z3", secs: 600 },
+              { id: "Z4", secs: 400 },
+              { id: "Z5", secs: 120 },
+              { id: "Z6", secs: 60 },
+              { id: "Z7", secs: 53 },
+              { id: "SS", secs: 1260 },
+            ],
+          },
+        ],
+      });
+
+      const activities = await client.getActivities("2026-06-09", "2026-06-09");
+
+      expect(activities[0].icu_intensity).toBeCloseTo(0.893);
+      expect(activities[0].icu_zone_times).toEqual([758, 5400, 600, 400, 120, 60, 53]);
+      expect(activities[0].icu_ss_time).toBe(1260);
     });
 
     it("returns empty array when response is not an array", async () => {

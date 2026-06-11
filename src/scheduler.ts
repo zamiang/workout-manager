@@ -4,6 +4,7 @@ import type {
   WorkoutType,
   CyclingIntensity,
   Config,
+  IntervalsEvent,
   XertTrainingInfo,
 } from "./types.js";
 import { mostDeficientZone, zoneLabel, type Zone } from "./zones.js";
@@ -16,6 +17,13 @@ function addDays(dateStr: string, days: number): string {
   const d = new Date(dateStr);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+// Whole days from `from` to `to` (both YYYY-MM-DD, parsed as UTC midnight).
+// Negative when `to` precedes `from` — events just before the window get a
+// negative index so adjacency/gap math still sees them.
+function dayDiff(from: string, to: string): number {
+  return Math.round((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000);
 }
 
 export type FatigueLevel = "fresh" | "moderate" | "fatigued" | "very_fatigued";
@@ -68,6 +76,28 @@ export function rampGuardTriggered(rampRatePct: number | undefined, config: Conf
 function isHard(type: WorkoutType, intensity: CyclingIntensity | "hard"): boolean {
   if (type === "weights" || type === "sweet_spot") return true;
   return intensity === "hard";
+}
+
+// What an existing calendar event counts as for placement constraints.
+export type ExistingEventKind = "weights" | "sweet_spot" | "hard_cycling" | "easy" | "other";
+
+// Classify an existing calendar event so locked days participate in the
+// scheduler's constraints instead of being invisible. Name patterns cover
+// planner-written events and hand-added ones; planned IF is the fallback for
+// arbitrary names (e.g. Xert workout-of-the-day titles).
+export function classifyExistingEvent(e: IntervalsEvent): ExistingEventKind {
+  if (e.category === "NOTE") return "other"; // rest-day notes carry no training stress
+  if (e.category?.startsWith("RACE")) return "hard_cycling";
+  if (e.type === "WeightTraining" || /strength|weights/i.test(e.name)) return "weights";
+  if (/sweet ?spot/i.test(e.name)) return "sweet_spot";
+  if (/vo2|threshold|interval|over[\s-]?under|anaerobic|sprint/i.test(e.name)) {
+    return "hard_cycling";
+  }
+  if (/easy|endurance|recovery|long|zone ?2|\bz2\b/i.test(e.name)) return "easy";
+  if (typeof e.icu_intensity === "number") {
+    return e.icu_intensity >= 0.8 ? "hard_cycling" : "easy";
+  }
+  return "other";
 }
 
 function buildCyclingDescription(
@@ -141,6 +171,30 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   for (let i = 0; i < days; i++) dates.push(addDays(startDate, i));
   const available = dates.map((d, i) => (lockedDates.has(d) ? -1 : i)).filter((i) => i >= 0);
 
+  // Seed constraint state from existing events so locked days aren't invisible
+  // to placement: an existing sweet-spot fills this week's quota, existing hard
+  // sessions block adjacent hard placement, and existing strength sessions
+  // count toward weight_sessions and min_weight_gap_days. Events shortly
+  // before the window get a negative index — they participate in adjacency and
+  // gap math but not in this week's quotas.
+  const existingHardDays = new Set<number>();
+  const existingWeightDays: number[] = [];
+  let existingSweetSpots = 0;
+  let existingHardRides = 0;
+  for (const e of existingEvents) {
+    const idx = dayDiff(startDate, dayKey(e.start_date_local));
+    if (idx >= days) continue;
+    const kind = classifyExistingEvent(e);
+    if (kind === "easy" || kind === "other") continue;
+    existingHardDays.add(idx);
+    if (kind === "weights") {
+      existingWeightDays.push(idx);
+    } else if (idx >= 0) {
+      if (kind === "sweet_spot") existingSweetSpots++;
+      else existingHardRides++;
+    }
+  }
+
   const fatigue = classifyFatigue(trainingLoad.tsb, config);
   // When the ramp guard fires, treat the week as moderate at best — drops
   // hard cycling targets entirely and downgrades hard fills to easy. Same
@@ -169,15 +223,16 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   // Each day can hold multiple workouts (hard cycling + weights = one stacked
   // training day, two PlannedWorkout entries).
   const plan: PlannedWorkout[][] = Array.from({ length: days }, () => []);
-  const isHardDay = (idx: number): boolean => plan[idx].some((w) => isHard(w.type, w.intensity));
+  const isHardDay = (idx: number): boolean =>
+    existingHardDays.has(idx) ||
+    (idx >= 0 && idx < days && plan[idx].some((w) => isHard(w.type, w.intensity)));
   const isEmpty = (idx: number): boolean => plan[idx].length === 0;
-  const wouldCreateBackToBack = (idx: number): boolean => {
-    if (idx > 0 && isHardDay(idx - 1)) return true;
-    if (idx < days - 1 && isHardDay(idx + 1)) return true;
-    return false;
-  };
+  const wouldCreateBackToBack = (idx: number): boolean =>
+    isHardDay(idx - 1) || isHardDay(idx + 1);
   const respectsWeightGap = (idx: number, slots: number[]): boolean =>
-    slots.every((s) => Math.abs(idx - s) >= scheduling.min_weight_gap_days);
+    [...slots, ...existingWeightDays].every(
+      (s) => Math.abs(idx - s) >= scheduling.min_weight_gap_days,
+    );
 
   // Phase 0: when very fatigued, reserve day 0 as rest before any hard placement.
   if (veryFatigued && available.includes(0)) {

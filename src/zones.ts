@@ -21,9 +21,10 @@ export const POLARIZED_TARGETS: Record<Zone, number> = {
 // fill themselves in via the easy/moderate cycling fills.
 export const HARD_ZONES: Zone[] = ["sweet_spot", "threshold", "vo2", "anaerobic"];
 
-// Power-zone-time index → primary Zone. Intervals.icu's icu_zone_times is a
-// 7-element array of seconds (Z1..Z7). Sweet spot has no native bucket, so it
-// can only be detected via IF banding.
+// Power-zone-time index → primary Zone. icu_zone_times is normalized to a
+// 7-element array of seconds (Z1..Z7) by IntervalsClient. The API's native
+// sweet-spot ("SS") bucket overlaps Z3/Z4 and is carried separately on
+// Activity.icu_ss_time.
 const ZONE_TIMES_TO_ZONE: Zone[] = [
   "endurance", // Z1: active recovery
   "endurance", // Z2: endurance
@@ -63,6 +64,12 @@ export function classifyActivity(a: Activity): Zone | null {
   if (a.icu_training_load <= 0) return null;
 
   if (a.icu_zone_times && a.icu_zone_times.some((t) => t > 0)) {
+    // The SS bucket double-counts seconds that also sit in Z3/Z4, so it can't
+    // join the dominant-zone scan — but when it outweighs every individual
+    // zone, sweet spot is the ride's real focus.
+    if (a.icu_ss_time != null && a.icu_ss_time > Math.max(...a.icu_zone_times)) {
+      return "sweet_spot";
+    }
     const z = dominantZoneFromTimes(a.icu_zone_times);
     if (z) return z;
   }

@@ -38,6 +38,50 @@ function parseEvent(raw: unknown): IntervalsEvent | null {
   };
 }
 
+// Activities report icu_intensity as a percentage (e.g. 89.3) while planned
+// events use a fraction. No real IF fraction exceeds ~2, so values above 3 can
+// only be percentages.
+function normalizeIntensity(raw: unknown): number | null {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) return null;
+  return raw > 3 ? raw / 100 : raw;
+}
+
+// icu_zone_times arrives either as a plain seconds array ([z1, z2, ...]) or as
+// an array of {id, secs} objects ({id: "Z1"} .. {id: "Z7"}, plus an {id: "SS"}
+// sweet-spot bucket that overlaps Z3/Z4 and must not be folded into the Z1..Z7
+// array). Normalize both to a 7-element Z1..Z7 seconds array, with SS separate.
+function normalizeZoneTimes(raw: unknown): {
+  zoneTimes: number[] | null;
+  ssTime: number | null;
+} {
+  if (!Array.isArray(raw) || raw.length === 0) return { zoneTimes: null, ssTime: null };
+
+  if (raw.every((t) => typeof t === "number")) {
+    const zoneTimes = Array.from({ length: 7 }, (_, i) => (raw[i] as number) ?? 0);
+    return { zoneTimes, ssTime: null };
+  }
+
+  const zoneTimes = new Array<number>(7).fill(0);
+  let ssTime: number | null = null;
+  let sawZone = false;
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Record<string, unknown>;
+    const id = typeof e.id === "string" ? e.id : "";
+    const secs = typeof e.secs === "number" && Number.isFinite(e.secs) ? e.secs : 0;
+    if (id === "SS") {
+      ssTime = secs;
+      continue;
+    }
+    const m = /^Z([1-7])$/.exec(id);
+    if (m) {
+      zoneTimes[Number(m[1]) - 1] = secs;
+      sawZone = true;
+    }
+  }
+  return { zoneTimes: sawZone ? zoneTimes : null, ssTime };
+}
+
 export class IntervalsClient {
   private headers: Record<string, string>;
   private fetch: FetchFn;
@@ -99,15 +143,15 @@ export class IntervalsClient {
     if (!Array.isArray(data)) return [];
     return data.map((raw) => {
       const a = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+      const { zoneTimes, ssTime } = normalizeZoneTimes(a.icu_zone_times);
       return {
         id: typeof a.id === "string" ? a.id : String(a.id ?? ""),
         start_date_local: typeof a.start_date_local === "string" ? a.start_date_local : "",
         type: typeof a.type === "string" ? a.type : "",
         icu_training_load: typeof a.icu_training_load === "number" ? a.icu_training_load : 0,
-        icu_intensity: typeof a.icu_intensity === "number" ? a.icu_intensity : null,
-        // Intervals returns icu_zone_times as either an array of seconds-per-zone
-        // or as an object keyed by zone name; pass through whichever is present.
-        icu_zone_times: Array.isArray(a.icu_zone_times) ? (a.icu_zone_times as number[]) : null,
+        icu_intensity: normalizeIntensity(a.icu_intensity),
+        icu_zone_times: zoneTimes,
+        icu_ss_time: ssTime,
       };
     });
   }
