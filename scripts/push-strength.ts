@@ -32,6 +32,10 @@ const rawArgs = process.argv.slice(2);
 const apply = rawArgs.includes("--apply");
 const force = rawArgs.includes("--force");
 const fileIdx = rawArgs.indexOf("--file");
+if (fileIdx >= 0 && !rawArgs[fileIdx + 1]) {
+  console.error("--file requires a path argument, e.g. --file path/to/export.csv");
+  process.exit(1);
+}
 const csvPath = fileIdx >= 0 ? rawArgs[fileIdx + 1] : DEFAULT_CSV;
 const dayFilter = rawArgs.find((a) => /^\d{4}-\d{2}-\d{2}$/.test(a)) ?? null;
 
@@ -136,7 +140,12 @@ if (workoutDates.length === 0) {
 const oldest = workoutDates[0].slice(0, 10);
 const newest = workoutDates[workoutDates.length - 1].slice(0, 10);
 
-const client = new IntervalsClient(process.env.INTERVALS_API_KEY!);
+const intervalsKey = process.env.INTERVALS_API_KEY;
+if (!intervalsKey) {
+  console.error("Missing INTERVALS_API_KEY in .env (Intervals.icu → Settings → API).");
+  process.exit(1);
+}
+const client = new IntervalsClient(intervalsKey);
 const activities = await client.getActivities(oldest, newest);
 
 // Index WeightTraining activities by exact start timestamp, plus a same-day
@@ -186,7 +195,10 @@ for (const date of workoutDates) {
   }
   matched++;
 
-  const existing = apply || force ? await client.getActivityDescription(id) : "";
+  // Always fetch the description — even in dry run — so the ✓/⊘ shown here
+  // matches what --apply would actually do (otherwise dry run never reports
+  // the "non-Strong description, skipped" case).
+  const existing = await client.getActivityDescription(id);
   const ours = existing.startsWith(MARKER);
   if (existing.trim() && !ours && !force) {
     skipped++;

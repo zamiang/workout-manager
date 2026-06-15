@@ -39,9 +39,19 @@ function flagValue(name: string): string | undefined {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 }
-const pages = Math.max(1, Number(flagValue("--pages") ?? 1));
+function numericFlag(name: string, fallback: number): number {
+  const raw = flagValue(name);
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) {
+    console.error(`${name} expects a number, got "${raw}".`);
+    process.exit(1);
+  }
+  return n;
+}
+const pages = Math.max(1, numericFlag("--pages", 1));
 const since = flagValue("--since") ?? null; // YYYY-MM-DD; skip workouts before this
-const toleranceMin = Number(flagValue("--tolerance") ?? 10);
+const toleranceMin = numericFlag("--tolerance", 10);
 
 // --- Hevy types (subset of the API we use) ---
 interface HevySet {
@@ -122,7 +132,12 @@ const dayMs = 86_400_000;
 const oldest = new Date(Math.min(...epochs) - dayMs).toISOString().slice(0, 10);
 const newest = new Date(Math.max(...epochs) + dayMs).toISOString().slice(0, 10);
 
-const client = new IntervalsClient(process.env.INTERVALS_API_KEY!);
+const intervalsKey = process.env.INTERVALS_API_KEY;
+if (!intervalsKey) {
+  console.error("Missing INTERVALS_API_KEY in .env (Intervals.icu → Settings → API).");
+  process.exit(1);
+}
+const client = new IntervalsClient(intervalsKey);
 const activities = (await client.getActivities(oldest, newest)).filter(
   (a) => a.type === "WeightTraining" && a.start_date,
 );
@@ -166,7 +181,10 @@ for (const w of [...selected].sort((a, b) => a.start_time.localeCompare(b.start_
   }
   matched++;
 
-  const existing = apply || force ? await client.getActivityDescription(id) : "";
+  // Always fetch the description — even in dry run — so the ✓/⊘ shown here
+  // matches what --apply would actually do (otherwise dry run never reports
+  // the "non-Strong description, skipped" case).
+  const existing = await client.getActivityDescription(id);
   const ours = existing.startsWith(MARKER);
   if (existing.trim() && !ours && !force) {
     skipped++;
