@@ -160,6 +160,7 @@ describe("IntervalsClient", () => {
           {
             id: "i12345",
             start_date_local: "2026-04-19T08:00:00",
+            start_date: "2026-04-19T12:00:00Z",
             type: "Ride",
             icu_training_load: 78,
             icu_intensity: 0.82,
@@ -185,6 +186,7 @@ describe("IntervalsClient", () => {
       expect(activities[0]).toEqual({
         id: "i12345",
         start_date_local: "2026-04-19T08:00:00",
+        start_date: "2026-04-19T12:00:00Z",
         type: "Ride",
         icu_training_load: 78,
         icu_intensity: 0.82,
