@@ -254,7 +254,7 @@ describe("workoutToEvent", () => {
     expect(event.icu_intensity).toBe(0.88);
   });
 
-  it("emits an HR-targeted structured workout for an easy ride", () => {
+  it("emits a power+HR structured workout for an easy ride", () => {
     const event = workoutToEvent({
       date: "2026-04-20",
       type: "cycling",
@@ -265,7 +265,8 @@ describe("workoutToEvent", () => {
       durationMin: 75,
       intensityFactor: 0.62,
     });
-    expect(event.description).toContain("Z2 HR");
+    expect(event.description).toContain("Z2 HR"); // HR-zone target for display
+    expect(event.description).toContain("62%"); // power target so Intervals.icu computes load
     expect(event.moving_time).toBe(75 * 60);
     // TSS is recomputed from the structured duration (here unchanged at 75 min).
     expect(event.icu_training_load).toBe(Math.round((75 / 60) * 0.62 ** 2 * 100));

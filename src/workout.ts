@@ -16,11 +16,15 @@ export interface StructuredWorkout {
   minutes: number; // total step duration, so callers can keep planned load consistent
 }
 
-// A steady Zone 2 endurance ride paced by heart rate. `Z2 HR` makes Intervals.icu
-// resolve the target bpm band from the athlete's stored HR zones.
-export function easyEnduranceWorkout(minutes: number): StructuredWorkout {
+// A steady Zone 2 endurance ride carrying BOTH a power target and an HR-zone
+// target. The power target (`{ftpPct}%`) is what Intervals.icu uses to compute
+// planned load/CTL — an HR-only step leaves normalized_power at 0, so it can't
+// forecast TSS and falls back to a broken ~33% estimate. `Z2 HR` then pins the
+// heart-rate target so the athlete still sees the stored-zone bpm band. The
+// power target is set to the planned IF so the computed load matches the plan.
+export function easyEnduranceWorkout(minutes: number, ftpPct: number): StructuredWorkout {
   return {
-    text: `- ${minutes}m Z2 HR Steady Zone 2 endurance`,
+    text: `- ${minutes}m ${ftpPct}% Z2 HR Steady Zone 2 endurance`,
     minutes,
   };
 }
@@ -56,8 +60,13 @@ export function sweetSpotWorkout(): StructuredWorkout {
 // their prose descriptions.
 export function structuredWorkoutFor(w: PlannedWorkout): StructuredWorkout | null {
   if (w.type === "sweet_spot") return sweetSpotWorkout();
-  if (w.type === "cycling" && w.intensity === "easy" && typeof w.durationMin === "number") {
-    return easyEnduranceWorkout(w.durationMin);
+  if (
+    w.type === "cycling" &&
+    w.intensity === "easy" &&
+    typeof w.durationMin === "number" &&
+    typeof w.intensityFactor === "number"
+  ) {
+    return easyEnduranceWorkout(w.durationMin, Math.round(w.intensityFactor * 100));
   }
   return null;
 }

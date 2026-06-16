@@ -141,11 +141,15 @@ shows them in the calendar and the Companion app:
 
 - **Sweet-spot sessions** are written as power steps (`88-94%`), so Intervals.icu
   computes **target watts** from your stored FTP.
-- **Easy and long endurance rides** are written as a heart-rate step (`Z2 HR`),
-  so Intervals.icu computes the **target bpm** band from your stored HR zones.
+- **Easy and long endurance rides** are written with both a power target and an
+  HR-zone target (`62% Z2 HR`): the **HR zone** shows the target bpm band from
+  your stored HR zones, while the **power target** (set to the planned IF) is
+  what Intervals.icu uses to compute planned load. An HR-only step leaves
+  `normalized_power` at 0, so Intervals.icu can't forecast TSS/CTL and falls
+  back to a broken ~33% estimate — the explicit power target avoids that.
 
-A step targets one primary metric, so quality work is paced by power and the
-aerobic base by heart rate — each derived from your own stored zones. Hard Xert
+Quality work is paced by power and the aerobic base by heart rate — each
+derived from your own stored zones. Hard Xert
 workout-of-the-day rides (no fixed structure) and weight sessions (no power/HR
 model) keep their prose descriptions. The full coaching rationale for the
 sweet-spot session lives in `config.yaml` and `docs/`; the calendar event
