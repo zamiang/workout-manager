@@ -3,18 +3,20 @@ import { easyEnduranceWorkout, sweetSpotWorkout, structuredWorkoutFor } from "..
 import type { PlannedWorkout } from "../src/types.js";
 
 describe("easyEnduranceWorkout", () => {
-  it("targets heart rate zone 2 so Intervals.icu derives bpm from stored HR zones", () => {
-    const w = easyEnduranceWorkout(75);
-    expect(w.text).toContain("Z2 HR");
-    // A single steady step whose duration matches the requested minutes.
+  it("writes the power target ahead of the HR zone, in the order the parser expects", () => {
+    const w = easyEnduranceWorkout(75, 62);
+    // An HR-only step leaves normalized_power at 0 (broken planned load); the
+    // power target fixes it, and `% Z2 HR` is the order Intervals.icu parses.
+    expect(w.text).toContain("62% Z2 HR");
     expect(w.text.trim().startsWith("- 75m")).toBe(true);
     expect(w.minutes).toBe(75);
   });
 
-  it("does not use a power target (endurance is paced by HR)", () => {
-    const w = easyEnduranceWorkout(180);
-    expect(w.text).not.toContain("%");
-    expect(w.minutes).toBe(180);
+  it("reports an intensityFactor matching the whole-percent power target", () => {
+    // The step text rounds to a whole percent; intensityFactor must mirror that
+    // rounding so a caller's submitted TSS matches the step Intervals.icu reads.
+    expect(easyEnduranceWorkout(180, 62).intensityFactor).toBe(0.62);
+    expect(easyEnduranceWorkout(75, 63).intensityFactor).toBe(0.63);
   });
 });
 
@@ -54,14 +56,20 @@ describe("structuredWorkoutFor", () => {
     expect(s?.text).toContain("88-94%");
   });
 
-  it("builds an HR endurance workout for an easy ride with a planned duration", () => {
-    const s = structuredWorkoutFor(planned({ intensity: "easy", durationMin: 90 }));
-    expect(s?.text).toContain("Z2 HR");
+  it("builds a power+HR endurance workout for an easy ride with duration and IF", () => {
+    const s = structuredWorkoutFor(
+      planned({ intensity: "easy", durationMin: 90, intensityFactor: 0.62 }),
+    );
+    expect(s?.text).toContain("62% Z2 HR"); // power target (load) + HR-zone target (display)
     expect(s?.minutes).toBe(90);
   });
 
   it("returns null for easy rides with no planned duration", () => {
-    expect(structuredWorkoutFor(planned({ intensity: "easy" }))).toBeNull();
+    expect(structuredWorkoutFor(planned({ intensity: "easy", intensityFactor: 0.62 }))).toBeNull();
+  });
+
+  it("returns null for easy rides with no planned IF (no power target to compute load)", () => {
+    expect(structuredWorkoutFor(planned({ intensity: "easy", durationMin: 90 }))).toBeNull();
   });
 
   it("returns null for hard Xert rides (no deterministic structure)", () => {
