@@ -788,6 +788,47 @@ describe("schedule", () => {
       expect(weights.map((w) => w.date)).not.toContain("2026-04-20");
     });
 
+    it("an existing long endurance ride suppresses promoting a second one", () => {
+      // A long ride already on the calendar (Mon, idx 1) must stop the planner
+      // from promoting one of its own easy rides to a second long ride.
+      const result = schedule(
+        makeInput({
+          existingEvents: [
+            ev("2026-04-21", "Long Endurance Ride", "Ride", { icu_intensity: 0.62 }),
+          ],
+        }),
+      );
+      expect(result.filter((w) => w.name === "Long Endurance Ride")).toHaveLength(0);
+      // The would-be long ride stays a normal easy ride at the standard duration.
+      const easyRides = result.filter((w) => w.type === "cycling" && w.intensity === "easy");
+      expect(easyRides.length).toBeGreaterThan(0);
+      for (const w of easyRides) expect(w.durationMin).toBe(BASE_CONFIG.load_targets.easy_minutes);
+    });
+
+    it("a name merely containing 'long' as a substring does not suppress promotion", () => {
+      // "Prolonged" contains "long" but isn't a long ride — the word-boundary
+      // regex must not let it suppress the weekly promotion.
+      const result = schedule(
+        makeInput({
+          existingEvents: [ev("2026-04-21", "Prolonged Effort", "Ride", { icu_intensity: 0.62 })],
+        }),
+      );
+      expect(result.filter((w) => w.name === "Long Endurance Ride")).toHaveLength(1);
+    });
+
+    it("a long ride before the window does not suppress this week's promotion", () => {
+      // Pre-window long ride (idx -1) belongs to last week; this week still gets
+      // its own promoted long ride.
+      const result = schedule(
+        makeInput({
+          existingEvents: [
+            ev("2026-04-19", "Long Endurance Ride", "Ride", { icu_intensity: 0.62 }),
+          ],
+        }),
+      );
+      expect(result.filter((w) => w.name === "Long Endurance Ride")).toHaveLength(1);
+    });
+
     it("existing easy rides lock their day but block nothing else", () => {
       const result = schedule(
         makeInput({

@@ -185,9 +185,16 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
   const existingWeightDays: number[] = [];
   let existingSweetSpots = 0;
   let existingHardRides = 0;
+  // A long endurance ride already on this week's calendar must suppress the
+  // promotion below — otherwise the planner promotes a second easy ride to a
+  // long ride and the week ends up with two. classifyExistingEvent folds "long"
+  // into the "easy" bucket, so match the name directly here. Word-boundary
+  // anchors avoid false positives like "Prolonged Effort" or "Longmont Crit".
+  let hasExistingLongRide = false;
   for (const e of existingEvents) {
     const idx = dayDiff(startDate, dayKey(e.start_date_local));
     if (idx >= days) continue;
+    if (idx >= 0 && /\blong\b/i.test(e.name)) hasExistingLongRide = true;
     const kind = classifyExistingEvent(e);
     if (kind === "easy" || kind === "other") continue;
     existingHardDays.add(idx);
@@ -391,7 +398,7 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
     out.push(...sorted);
   }
 
-  attachLoadTargets(out, config);
+  attachLoadTargets(out, config, hasExistingLongRide);
   return out;
 }
 
@@ -399,16 +406,25 @@ export function schedule(input: SchedulerInput): PlannedWorkout[] {
 // the calendar shows them and Intervals.icu folds them into the planned CTL
 // curve. TSS = (minutes / 60) * IF^2 * 100. The latest easy ride of the week is
 // promoted to the single long endurance ride (century durability) — a longer
-// duration at the same easy IF. Weights get a duration only (no TSS/IF), which
+// duration at the same easy IF — unless one is already on the calendar
+// (hasExistingLongRide), in which case no new ride is promoted so the week
+// keeps exactly one long ride. Weights get a duration only (no TSS/IF), which
 // matches how Intervals.icu treats WeightTraining.
-function attachLoadTargets(out: PlannedWorkout[], config: Config): void {
+function attachLoadTargets(
+  out: PlannedWorkout[],
+  config: Config,
+  hasExistingLongRide = false,
+): void {
   const lt = config.load_targets;
   const tss = (min: number, ifv: number): number => Math.round((min / 60) * ifv * ifv * 100);
 
-  // Promote the last easy cycling ride to the weekly long ride.
+  // Promote the last easy cycling ride to the weekly long ride, unless the
+  // calendar already holds one this week.
   let longIdx = -1;
-  for (let i = 0; i < out.length; i++) {
-    if (out[i].type === "cycling" && out[i].intensity === "easy") longIdx = i;
+  if (!hasExistingLongRide) {
+    for (let i = 0; i < out.length; i++) {
+      if (out[i].type === "cycling" && out[i].intensity === "easy") longIdx = i;
+    }
   }
 
   for (let i = 0; i < out.length; i++) {
