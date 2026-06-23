@@ -148,13 +148,11 @@ export class IntervalsClient {
     }
     const data = await res.json();
     if (!Array.isArray(data)) return null;
-    const ride = data.find(
-      (s) =>
-        s &&
-        typeof s === "object" &&
-        Array.isArray((s as Record<string, unknown>).types) &&
-        ((s as Record<string, unknown>).types as unknown[]).includes("Ride"),
-    ) as Record<string, unknown> | undefined;
+    const ride = data.find((s) => {
+      if (!s || typeof s !== "object") return false;
+      const types = (s as Record<string, unknown>).types;
+      return Array.isArray(types) && types.includes("Ride");
+    }) as Record<string, unknown> | undefined;
     return ride && typeof ride.ftp === "number" ? ride.ftp : null;
   }
 

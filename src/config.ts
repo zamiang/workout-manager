@@ -111,7 +111,10 @@ function validateReadiness(raw: unknown): Partial<ReadinessConfig> {
     }
     out.enabled = obj.enabled;
   }
-  const numericFields: (keyof ReadinessConfig)[] = [
+  // Exclude the boolean `enabled` key (validated above) so the indexed write
+  // type stays `number` — this lets us use `as number` like the sibling
+  // validators instead of an `as never` escape hatch.
+  const numericFields: Exclude<keyof ReadinessConfig, "enabled">[] = [
     "recent_days",
     "baseline_days",
     "min_baseline_samples",
@@ -123,11 +126,7 @@ function validateReadiness(raw: unknown): Partial<ReadinessConfig> {
     if (typeof obj[field] !== "number") {
       throw new Error(`readiness.${field} must be a number`);
     }
-    // `as never`, not `as number`: ReadinessConfig has a boolean member
-    // (`enabled`), so indexing Partial<ReadinessConfig> with a union key
-    // collapses the assignable type to `never`. `field` is always a numeric key
-    // here (enabled is validated separately above), so this is safe at runtime.
-    out[field] = obj[field] as never;
+    out[field] = obj[field] as number;
   }
   return out;
 }

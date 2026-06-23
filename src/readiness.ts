@@ -4,11 +4,12 @@ export type ReadinessStatus = "suppressed" | "normal" | "unknown";
 
 export interface ReadinessSignal {
   status: ReadinessStatus;
-  hrvDeviationSd?: number; // (recent HRV mean − baseline mean) / baseline SD; negative = parasympathetic suppression
-  rhrDeltaBpm?: number; // recent resting-HR mean − baseline mean; positive = elevated
+  hrvDeviationSd?: number; // (recent HRV median − baseline mean) / baseline SD; negative = parasympathetic suppression
+  rhrDeltaBpm?: number; // recent resting-HR median − baseline median; positive = elevated
   reason?: string; // human-readable summary for the status line, set only when suppressed
 }
 
+// Baseline centre/scale only — the recent window uses `median` (see below).
 const mean = (xs: number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length;
 
 // Median — used for the small recent window (and the baseline RHR centre) so a

@@ -4,7 +4,7 @@ import { loadConfig } from "./config.js";
 import { IntervalsClient } from "./intervals.js";
 import { XertClient } from "./xert.js";
 import { schedule, classifyFatigue, effectiveFatigue, rampGuardTriggered } from "./scheduler.js";
-import { computeReadiness } from "./readiness.js";
+import { computeReadiness, type ReadinessSignal } from "./readiness.js";
 import { todayLocal, addLocalDays } from "./dates.js";
 import { computeDistribution, POLARIZED_TARGETS, ZONES, zoneLabel } from "./zones.js";
 import { structuredWorkoutFor } from "./workout.js";
@@ -94,6 +94,16 @@ function requireEnv(name: string): string {
   const val = process.env[name];
   if (!val) throw new Error(`Missing environment variable: ${name}`);
   return val;
+}
+
+// One-line readiness summary for the status dashboard. "n/a" when there isn't
+// enough HRV/RHR history to judge, so the line is never silently misleading.
+export function formatReadiness(r: ReadinessSignal): string {
+  if (r.status === "suppressed") {
+    return `suppressed — ${r.reason} (planner downgrades the week one tier)`;
+  }
+  if (r.status === "normal") return "normal";
+  return "n/a (insufficient HRV/resting-HR history)";
 }
 
 export function formatPlan(workouts: PlannedWorkout[]): string {
@@ -247,16 +257,23 @@ async function main() {
     const today = todayLocal();
     const lookbackStr = addLocalDays(today, -28);
     const weekAgoStr = addLocalDays(today, -7);
+    // Fetch the wider readiness window so status shows the same readiness state
+    // the planner will act on; the ramp is still a trailing-7-day measure.
+    const wellnessStr = addLocalDays(
+      today,
+      -(config.readiness.baseline_days + config.readiness.recent_days),
+    );
 
     const [info, activities, wellnessRange, ftp] = await Promise.all([
       xert.getTrainingInfo(),
       intervals.getActivities(lookbackStr, today),
-      intervals.getTrainingLoadRange(weekAgoStr, today),
+      intervals.getTrainingLoadRange(wellnessStr, today),
       intervals.getFtp(),
     ]);
     const load = latestTrainingLoad(wellnessRange);
     const distribution = computeDistribution(activities);
-    const rampRatePct = computeWeeklyRampPct(wellnessRange);
+    const rampRatePct = computeWeeklyRampPct(wellnessRange.filter((e) => e.date >= weekAgoStr));
+    const readiness = computeReadiness(wellnessRange, config);
 
     if (json) {
       const deficits = Object.fromEntries(
@@ -265,6 +282,7 @@ async function main() {
       const out = {
         training_load: load,
         ftp,
+        readiness,
         xert: info,
         zones: { distribution, targets: POLARIZED_TARGETS, deficits },
         ramp: {
@@ -281,6 +299,7 @@ async function main() {
     console.log(`CTL (Fitness):  ${load.ctl}`);
     console.log(`ATL (Fatigue):  ${load.atl}`);
     console.log(`TSB (Form):     ${load.tsb}`);
+    console.log(`Readiness:      ${formatReadiness(readiness)}`);
     console.log();
     console.log(`FTP:    ${ftp !== null ? `${ftp}W` : "not set"}  (Intervals.icu)`);
     console.log(`LTP:    ${info.ltp}W`);
