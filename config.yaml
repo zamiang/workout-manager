@@ -163,4 +163,4 @@ readiness:
   baseline_days: 28 # window before the recent one used as the personal baseline
   min_baseline_samples: 14 # need this many baseline readings or readiness abstains
   hrv_drop_sd: 1.5 # recent HRV ≤ baseline_mean − 1.5·SD → suppressed
-  rhr_rise_bpm: 7 # recent resting HR ≥ baseline_mean + 7 bpm → suppressed
+  rhr_rise_bpm: 7 # recent resting HR ≥ baseline_median + 7 bpm → suppressed

@@ -281,7 +281,7 @@ async function main() {
       );
       const out = {
         training_load: load,
-        ftp,
+        icu_ftp: ftp,
         readiness,
         xert: info,
         zones: { distribution, targets: POLARIZED_TARGETS, deficits },

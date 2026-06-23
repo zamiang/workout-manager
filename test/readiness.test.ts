@@ -95,6 +95,21 @@ describe("computeReadiness", () => {
     expect(computeReadiness(range, makeConfig()).status).toBe("normal");
   });
 
+  it("documents that a 2-sample recent window loses median outlier protection", () => {
+    // MIN_RECENT_SAMPLES is 2, but median([artifact, normal]) is their average —
+    // no protection. This pins the known weak spot: with exactly two readings,
+    // one artifact CAN fire suppression. (Four readings, tested above, cannot.)
+    const entries: WellnessEntry[] = [];
+    for (let i = 0; i < 20; i++) {
+      const d = new Date(Date.UTC(2026, 4, 24) + i * 86_400_000); // 2026-05-24 .. 06-12
+      entries.push({ date: d.toISOString().slice(0, 10), ctl: 50, atl: 50, tsb: 0, restingHR: 56 });
+    }
+    entries.push({ date: "2026-06-22", ctl: 50, atl: 50, tsb: 0, restingHR: 52 });
+    entries.push({ date: "2026-06-23", ctl: 50, atl: 50, tsb: 0, restingHR: 102 }); // artifact
+    // median([52, 102]) = 77 vs baseline 56 → +21 bpm → fires.
+    expect(computeReadiness(entries, makeConfig()).status).toBe("suppressed");
+  });
+
   it("never suppresses on a flat baseline (sd 0 → no usable spread)", () => {
     // All baseline HRV identical → SD 0 → deviation can't be scored, so even a
     // large recent drop must not fire.

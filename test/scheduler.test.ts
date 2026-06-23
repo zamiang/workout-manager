@@ -494,6 +494,25 @@ describe("schedule", () => {
       expect(result.filter((w) => w.type === "sweet_spot")).toHaveLength(1);
     });
 
+    it("does not stack with the ramp guard — a suppressed fresh+ramp week equals a plain moderate week", () => {
+      // fresh TSB → suppressed downgrades to moderate; classifyIntensity is then
+      // "moderate", so the ramp guard's `baseIntensity === "hard"` check is
+      // already false. The two guards must not compound into something harsher
+      // than a normal moderate week.
+      const suppressedFreshRamp = schedule(
+        makeInput({
+          trainingLoad: freshLoad,
+          readiness: { status: "suppressed" },
+          rampRatePct: 9.5,
+        }),
+      );
+      const plainModerate = schedule(makeInput({ trainingLoad: { ctl: 50, atl: 50, tsb: 0 } }));
+      expect(suppressedFreshRamp).toEqual(plainModerate);
+      expect(suppressedFreshRamp.some((w) => w.type === "cycling" && w.intensity === "hard")).toBe(
+        false,
+      );
+    });
+
     it("leaves a very_fatigued week's plan byte-for-byte unchanged when suppressed", () => {
       // very_fatigued is already the floor: a suppressed signal must not deepen
       // the protocol. The whole plan (day-0 rest, single weights, no sweet-spot,

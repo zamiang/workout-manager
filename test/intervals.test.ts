@@ -194,6 +194,14 @@ describe("IntervalsClient", () => {
       expect(await client.getFtp()).toBeNull();
     });
 
+    it("treats an explicit FTP of 0 as not set (null)", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 2, types: ["Ride"], ftp: 0 }],
+      });
+      expect(await client.getFtp()).toBeNull();
+    });
+
     it("returns null when the response is not an array", async () => {
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
       expect(await client.getFtp()).toBeNull();

@@ -49,7 +49,7 @@ export interface ReadinessConfig {
   baseline_days: number; // default 28 — window preceding the recent one used as the baseline
   min_baseline_samples: number; // default 14 — need this many baseline readings or we abstain
   hrv_drop_sd: number; // default 1.5 — recent HRV ≤ baseline_mean − this·SD ⇒ suppressed
-  rhr_rise_bpm: number; // default 7 — recent resting HR ≥ baseline_mean + this ⇒ suppressed
+  rhr_rise_bpm: number; // default 7 — recent resting HR ≥ baseline_median + this ⇒ suppressed
 }
 
 export interface Config {

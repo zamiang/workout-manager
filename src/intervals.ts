@@ -153,7 +153,9 @@ export class IntervalsClient {
       const types = (s as Record<string, unknown>).types;
       return Array.isArray(types) && types.includes("Ride");
     }) as Record<string, unknown> | undefined;
-    return ride && typeof ride.ftp === "number" ? ride.ftp : null;
+    // `> 0`: some accounts report an unset FTP as 0, which should read as
+    // "not set", not a literal 0 W (mirrors the v > 0 guard in readiness.ts).
+    return ride && typeof ride.ftp === "number" && ride.ftp > 0 ? ride.ftp : null;
   }
 
   async getActivities(oldest: string, newest: string): Promise<Activity[]> {
