@@ -357,8 +357,7 @@ async function main() {
   const tsbFatigue = classifyFatigue(load.tsb, config);
   // Match the scheduler: suppressed readiness downgrades the displayed tier too,
   // so the status line never contradicts the plan it printed.
-  const fatigue =
-    readiness.status === "suppressed" ? downgradeOneTier(tsbFatigue) : tsbFatigue;
+  const fatigue = readiness.status === "suppressed" ? downgradeOneTier(tsbFatigue) : tsbFatigue;
   const fatigueLabel: Record<string, string> = {
     fresh: "fresh — scheduling hard rides",
     moderate: "moderate — mixed intensity",
