@@ -86,12 +86,26 @@ describe("computeReadiness", () => {
     expect(computeReadiness(range, makeConfig()).status).toBe("normal");
   });
 
-  it("ignores a single implausible reading in the recent window (median, not mean)", () => {
-    // One 102 bpm artifact among otherwise-normal mornings: a mean would read
-    // ~+13 bpm and flag suppressed; the median (~62) stays under the threshold.
+  it("ignores a single implausible reading in the recent window (artifact ceiling)", () => {
+    // One 102 bpm artifact among otherwise-normal mornings. The ceiling
+    // (baseline_median 56 + 25 = 81) drops 102 before the median is taken, so
+    // recRhr is [52, 60, 64] → +2 bpm → normal.
     const range = makeRange({
       baselineRhr: Array(20).fill(56),
       recentRhr: [102, 52, 60, 64],
+    });
+    expect(computeReadiness(range, makeConfig()).status).toBe("normal");
+  });
+
+  it("relies on the median for a single gray-zone outlier the ceiling keeps", () => {
+    // 75 bpm is below the ceiling (56 + 25 = 81) so it survives the filter, and
+    // it's above rhr_rise_bpm (56 + 7 = 63). The recent-window median is what
+    // resists it here: median([52, 60, 64, 75]) = 62 → +6 bpm → normal. A mean
+    // would read ~+7.75 and fire. This pins the median's independent value for
+    // mid-range outliers that the artifact ceiling does not catch.
+    const range = makeRange({
+      baselineRhr: Array(20).fill(56),
+      recentRhr: [75, 52, 60, 64],
     });
     expect(computeReadiness(range, makeConfig()).status).toBe("normal");
   });

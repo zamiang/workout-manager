@@ -216,6 +216,15 @@ export async function loadConfig(filePath: string): Promise<Config> {
     ...READINESS_DEFAULTS,
     ...validateReadiness(doc.readiness),
   };
+  // The artifact ceiling must sit above the alarm threshold, or the filter would
+  // drop genuine elevations before they can trip suppression — a self-defeating
+  // config that fails silently otherwise.
+  if (readiness.rhr_artifact_bpm <= readiness.rhr_rise_bpm) {
+    throw new Error(
+      `readiness.rhr_artifact_bpm (${readiness.rhr_artifact_bpm}) must be greater than ` +
+        `rhr_rise_bpm (${readiness.rhr_rise_bpm}) — the artifact filter would suppress genuine alarms`,
+    );
+  }
 
   return {
     weight_training,
