@@ -204,4 +204,18 @@ scheduling:
 
     await expect(loadConfig(file)).rejects.toThrow("tsb_fresh");
   });
+
+  it("throws when rhr_artifact_bpm is not above rhr_rise_bpm", async () => {
+    const yaml =
+      VALID_YAML +
+      `
+readiness:
+  rhr_rise_bpm: 7
+  rhr_artifact_bpm: 6
+`;
+    const file = path.join(tmpDir, "config.yaml");
+    await fs.writeFile(file, yaml, "utf8");
+
+    await expect(loadConfig(file)).rejects.toThrow("rhr_artifact_bpm");
+  });
 });
