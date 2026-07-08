@@ -99,6 +99,13 @@ export function sessionToEvent(s: PlanSession, date: string, config: Config): In
       if (typeof s.intensity === "number") {
         event.icu_training_load = Math.round((structured.minutes / 60) * s.intensity ** 2 * 100);
       }
+    } else if (!structured && s.minutes === undefined) {
+      // Prose sessions (weights) fall back to the config duration. Without an
+      // explicit moving_time Intervals.icu derives one by parsing the prose
+      // description as a workout, and any duration-like token (e.g. a 37-inch
+      // band written as `37"`) becomes a bogus seconds-long plan that the
+      // completed activity then fails to auto-pair with.
+      event.moving_time = Math.round(def.duration_minutes * 60);
     }
     return event;
   }
