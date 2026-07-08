@@ -23,6 +23,15 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
+# A manual dispatch near the Monday cron must not race the scheduled run on
+# the same Intervals.icu writes; queue instead of overlapping.
+concurrency:
+  group: weekly-plan
+  cancel-in-progress: false
+
 env:
   # The planner anchors "today" to the host-local date (src/dates.ts); without
   # this the UTC runner would plan from the wrong day in the evening/overnight.
@@ -43,7 +52,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Informational log only — a transient failure here must not block the
+      # plan push below.
       - name: Training status snapshot
+        continue-on-error: true
         run: npm run status
         env:
           INTERVALS_API_KEY: ${{ secrets.INTERVALS_API_KEY }}
