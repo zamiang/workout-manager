@@ -219,3 +219,25 @@ readiness:
     await expect(loadConfig(file)).rejects.toThrow("rhr_artifact_bpm");
   });
 });
+
+describe("repo config.yaml", () => {
+  // Intervals.icu parses WORKOUT-event descriptions as plain-text workouts,
+  // where `37"` means 37 seconds and `5'` means 5 minutes. A prose description
+  // containing such tokens (e.g. a 37-inch band written as `37"`) gets turned
+  // into a bogus seconds-long workout_doc that overrides the event's explicit
+  // moving_time at creation — and the completed activity then fails to
+  // auto-pair (planned session shows 0% compliance). Keep prose descriptions
+  // free of digit/quote duration tokens; write "37-inch" instead.
+  it("keeps prose workout descriptions free of duration-like tokens", async () => {
+    const config = await loadConfig("config.yaml");
+    const proseDescriptions = [
+      ["weight_training", config.weight_training.description],
+      ["weight_training_taper", config.weight_training_taper?.description ?? ""],
+    ] as const;
+    for (const [name, description] of proseDescriptions) {
+      expect(description, `${name}.description contains a duration-like token`).not.toMatch(
+        /\d["']|["']\d/,
+      );
+    }
+  });
+});

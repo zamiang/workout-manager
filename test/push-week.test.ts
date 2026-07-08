@@ -101,6 +101,16 @@ describe("sessionToEvent", () => {
     expect(event.icu_training_load).toBe(77);
   });
 
+  it("gives weight sessions the config duration as moving_time", () => {
+    // Regression guard: without an explicit moving_time, Intervals.icu derives
+    // one by parsing the prose description as a workout — duration-like tokens
+    // (e.g. a 37-inch band written as `37"`) produced a bogus seconds-long
+    // plan that the completed activity failed to auto-pair with (0% compliance).
+    const event = sessionToEvent({ day: "Mon", workout: "weight_training" }, "2026-06-10", config);
+    expect(event.type).toBe("WeightTraining");
+    expect(event.moving_time).toBe(60 * 60);
+  });
+
   it("keeps explicit session minutes when supplied", () => {
     const event = sessionToEvent(
       { day: "Wed", workout: "sweet_spot", minutes: 65 },
