@@ -217,6 +217,68 @@ describe("IntervalsClient", () => {
     });
   });
 
+  describe("getRideSportSettings", () => {
+    it("returns id, FTP and LTHR from the Ride entry", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          { id: 1, types: ["Run", "TrailRun"], ftp: null, lthr: 163 },
+          { id: 2, types: ["Ride", "VirtualRide"], ftp: 235, lthr: 160 },
+        ],
+      });
+      expect(await client.getRideSportSettings()).toEqual({ id: 2, ftp: 235, lthr: 160 });
+    });
+
+    it("nulls out unset (0) values but still returns the entry", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 2, types: ["Ride"], ftp: 0, lthr: 0 }],
+      });
+      expect(await client.getRideSportSettings()).toEqual({ id: 2, ftp: null, lthr: null });
+    });
+
+    it("returns null when no Ride entry exists or it has no numeric id", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ id: 1, types: ["Run"], ftp: 200 }],
+      });
+      expect(await client.getRideSportSettings()).toBeNull();
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{ types: ["Ride"], ftp: 235 }],
+      });
+      expect(await client.getRideSportSettings()).toBeNull();
+    });
+  });
+
+  describe("updateSportSettings", () => {
+    it("PUTs partial fields to the sport-settings entry", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) });
+
+      await client.updateSportSettings(2, { ftp: 232 });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://intervals.icu/api/v1/athlete/0/sport-settings/2",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ ftp: 232 }),
+        }),
+      );
+    });
+
+    it("throws on a non-ok response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 422,
+        text: async () => "nope",
+      });
+      await expect(client.updateSportSettings(2, { ftp: 232 })).rejects.toThrow(
+        "Intervals.icu API error (422)",
+      );
+    });
+  });
+
   describe("getActivities", () => {
     it("fetches activities and normalizes the fields we care about", async () => {
       mockFetch.mockResolvedValueOnce({
@@ -230,6 +292,7 @@ describe("IntervalsClient", () => {
             icu_training_load: 78,
             icu_intensity: 0.82,
             icu_zone_times: [600, 1200, 1800, 600, 0, 0, 0],
+            icu_rolling_ftp: 233,
           },
           {
             id: "i12346",
@@ -257,10 +320,12 @@ describe("IntervalsClient", () => {
         icu_intensity: 0.82,
         icu_zone_times: [600, 1200, 1800, 600, 0, 0, 0],
         icu_ss_time: null,
+        icu_rolling_ftp: 233,
       });
       expect(activities[1].icu_intensity).toBeNull();
       expect(activities[1].icu_zone_times).toBeNull();
       expect(activities[1].icu_ss_time).toBeNull();
+      expect(activities[1].icu_rolling_ftp).toBeNull(); // missing eFTP → null
       expect(activities[1].start_date).toBe(""); // missing start_date → "" (used by the Hevy matcher)
     });
 

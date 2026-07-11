@@ -50,6 +50,10 @@ const BASE_CONFIG: Config = {
     taper_zero_weeks: 1,
     race_date: null,
   },
+  ftp_sync: {
+    enabled: true,
+    max_change_pct: 10,
+  },
   readiness: {
     enabled: true,
     recent_days: 4,

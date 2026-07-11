@@ -53,6 +53,14 @@ export interface ReadinessConfig {
   rhr_artifact_bpm: number; // default 25 — resting HR ≥ baseline_median + this is a sensor artifact (e.g. a ride file's bogus "resting HR" overwriting the wellness value), not physiology, and is dropped before the median. Well above rhr_rise_bpm so a real alarm still fires.
 }
 
+// eFTP auto-sync: pull Intervals.icu's rolling FTP estimate from the latest
+// ride and write it to the Ride sport-settings FTP, so `% FTP` workout steps
+// and rendered watt callouts track fitness without hand edits after each test.
+export interface FtpSyncConfig {
+  enabled: boolean; // default true — when false, settings FTP is read but never written
+  max_change_pct: number; // default 10 — refuse a single eFTP jump bigger than this (bad-data guard)
+}
+
 export interface Config {
   weight_training: WorkoutDefinition;
   weight_training_taper?: WorkoutDefinition; // optional; falls back to weight_training
@@ -61,6 +69,7 @@ export interface Config {
   load_targets: LoadTargetsConfig;
   periodization: PeriodizationConfig;
   readiness: ReadinessConfig;
+  ftp_sync: FtpSyncConfig;
 }
 
 // --- Intervals.icu ---
@@ -100,6 +109,7 @@ export interface Activity {
   icu_intensity: number | null; // IF as a fraction, e.g. 0.89 (the API returns a percentage; normalized on read)
   icu_zone_times: number[] | null; // seconds in Z1..Z7 (normalized from the API's object form on read)
   icu_ss_time: number | null; // seconds in the native sweet-spot ("SS") band; overlaps Z3/Z4, so not part of icu_zone_times
+  icu_rolling_ftp?: number | null; // Intervals.icu's rolling eFTP estimate as of this activity; source for ftp_sync
 }
 
 // --- Xert ---

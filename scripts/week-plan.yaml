@@ -20,7 +20,8 @@
 # easy Z2 base, rebuilding volume before intensity resumes next week. This is
 # hand-tuned rather than `npm run plan` because the generator reads the fresh
 # TSB as license for hard rides.
-# Watts/HR use FTP 235 / LTHR 160.
+# Watts/HR render at push time from live Intervals.icu FTP/LTHR via the
+# {ftp}/{lthr}/{w:NN}/{hr:NN} placeholders (see ftp_sync in config.yaml).
 
 sessions:
   # Day 0 — ease back in: easy Z2 ride + strength, stacked. LIFT FIRST while
@@ -34,9 +35,10 @@ sessions:
     minutes: 75
     intensity: 0.62
     description: >
-      Easy Zone 2, ~75 min, conversational (~146W at 235 FTP, HR under ~133 /
-      83% LTHR 160). First ride back — keep it strictly aerobic, no surges, no
-      hills hammered. Do this AFTER the strength session as a flush spin.
+      Easy Zone 2, ~75 min, conversational (~{w:62}W at {ftp}W FTP, HR under
+      ~{hr:83} / 83% LTHR {lthr}). First ride back — keep it strictly aerobic,
+      no surges, no hills hammered. Do this AFTER the strength session as a
+      flush spin.
 
   - day: Mon
     workout: weight_training
@@ -63,8 +65,8 @@ sessions:
     minutes: 75
     intensity: 0.62
     description: >
-      Easy Zone 2, ~75 min, conversational (~146W at 235 FTP, HR under ~133).
-      Pure aerobic base — keep it boring and steady.
+      Easy Zone 2, ~75 min, conversational (~{w:62}W at {ftp}W FTP, HR under
+      ~{hr:83}). Pure aerobic base — keep it boring and steady.
 
   - day: Fri
     name: Easy Z2 Ride
@@ -73,8 +75,8 @@ sessions:
     minutes: 75
     intensity: 0.62
     description: >
-      Easy Zone 2, ~75 min, conversational (~146W at 235 FTP, HR under ~133).
-      Pure aerobic base — keep it boring and steady.
+      Easy Zone 2, ~75 min, conversational (~{w:62}W at {ftp}W FTP, HR under
+      ~{hr:83}). Pure aerobic base — keep it boring and steady.
 
   - day: Sat
     name: Easy Z2 Ride
@@ -83,8 +85,8 @@ sessions:
     minutes: 75
     intensity: 0.62
     description: >
-      Easy Zone 2, ~75 min, conversational (~146W at 235 FTP, HR under ~133).
-      Pure aerobic base — keep it boring and steady.
+      Easy Zone 2, ~75 min, conversational (~{w:62}W at {ftp}W FTP, HR under
+      ~{hr:83}). Pure aerobic base — keep it boring and steady.
 
   # Durability anchor — long aerobic to close the week and start rebuilding the
   # century base. Strictly Z2; if the legs feel flat from the layoff, cut it
@@ -96,7 +98,7 @@ sessions:
     minutes: 180
     intensity: 0.62
     description: >
-      Long Z2 endurance, ~3h. Strictly aerobic (~146W at 235 FTP, HR under
-      ~133). Practice century fueling: 60-90 g carb/hr from the first 30 min.
+      Long Z2 endurance, ~3h. Strictly aerobic (~{w:62}W at {ftp}W FTP, HR
+      under ~{hr:83}). Practice century fueling: 60-90 g carb/hr from the first 30 min.
       Durability over intensity — keep it steady to the end. First long ride
       back, so it's fine to trim to ~2h30 if you're fading.
