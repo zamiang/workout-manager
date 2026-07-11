@@ -86,6 +86,10 @@ weight_training_taper:
 sweet_spot:
   name: "Sweet Spot Intervals"
   duration_minutes: 60
+  # NOTE: the calendar event never carries this prose — sweet-spot sessions are
+  # always pushed as structured `% FTP` steps (src/workout.ts), which is what
+  # shows targets in Intervals.icu. This text is the coaching rationale kept
+  # with the config; its placeholders render wherever it does surface.
   description: |
     Warm-up (15 min)
     Easy Zone 2 spin at natural cadence (85-95 rpm), with 2-3 short 30s openers

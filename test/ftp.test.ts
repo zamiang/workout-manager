@@ -103,6 +103,9 @@ describe("renderTargets", () => {
   it("throws on a malformed placeholder instead of pushing literal braces", () => {
     expect(() => renderTargets("~{w:62%}W", values)).toThrow(/Malformed target placeholder/);
     expect(() => renderTargets("{hr:abc}", values)).toThrow(/Malformed target placeholder/);
+    // ftp/lthr take no argument — a colon suffix is a typo, not a silent no-op
+    expect(() => renderTargets("at {ftp:50}W", values)).toThrow(/Malformed target placeholder/);
+    expect(() => renderTargets("{lthr:xyz}", values)).toThrow(/Malformed target placeholder/);
   });
 });
 

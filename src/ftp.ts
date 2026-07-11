@@ -129,9 +129,11 @@ export function renderTargets(text: string, values: RenderTargetValues): string 
       return hi !== undefined ? `${at(lo)}-${at(hi)}` : at(lo);
     },
   );
-  // A placeholder the regex didn't consume (e.g. {w:abc}, {w:62%}) is a typo in
-  // the YAML — surface it instead of pushing literal braces to the calendar.
-  const leftover = rendered.match(/\{(?:ftp|lthr|w:[^}]*|hr:[^}]*)\}/);
+  // A placeholder the regex didn't consume (e.g. {w:abc}, {w:62%}, {ftp:50}) is
+  // a typo in the YAML — surface it instead of pushing literal braces to the
+  // calendar. Any brace form starting with a known keyword counts, whatever the
+  // suffix: the substitution pass consumed every well-formed one already.
+  const leftover = rendered.match(/\{(?:ftp|lthr|w|hr)(?::[^}]*)?\}/);
   if (leftover) {
     throw new Error(
       `Malformed target placeholder ${leftover[0]} — use {ftp}, {lthr}, {w:NN[-MM]}, {hr:NN[-MM]}`,
