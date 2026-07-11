@@ -189,6 +189,23 @@ sweet-spot session lives in `config.yaml` and `docs/`; the calendar event
 carries the executable structure plus short per-step labels. The builder lives
 in `src/workout.ts`.
 
+### FTP auto-sync (eFTP)
+
+`plan` and `push-week` read Intervals.icu's rolling **eFTP** estimate (the
+`icu_rolling_ftp` stamped on the latest ride) and write it to the Ride
+sport-settings FTP, so both the `% FTP` structured steps and the prose watt
+callouts track current fitness with no hand edits after each test. A single
+jump bigger than `ftp_sync.max_change_pct` is refused as bad data — apply it
+manually in Intervals.icu if it's real. `--dry-run` previews the update
+without writing; disable entirely with `ftp_sync.enabled: false`.
+
+Prose descriptions in `config.yaml` and `scripts/week-plan.yaml` never
+hardcode watts: they carry placeholders rendered at push time from the synced
+sport settings — `{ftp}`, `{lthr}`, `{w:88-94}` (watts at % FTP), `{hr:83}`
+(bpm at % LTHR). A placeholder that can't be resolved fails the push loudly
+rather than putting stale or literal-brace text on the calendar. The sync and
+renderer live in `src/ftp.ts`.
+
 ### Ramp guard
 
 If the trailing 7-day CTL ramp exceeds `max_weekly_ramp_pct`, hard cycling

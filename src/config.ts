@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import { parse } from "yaml";
 import type {
   Config,
+  FtpSyncConfig,
   LoadTargetsConfig,
   PeriodizationConfig,
   ReadinessConfig,
@@ -34,6 +35,11 @@ const LOAD_TARGETS_DEFAULTS: LoadTargetsConfig = {
   hard_if: 0.88,
   hard_minutes: 75,
   sweet_spot_if: 0.88,
+};
+
+const FTP_SYNC_DEFAULTS: FtpSyncConfig = {
+  enabled: true,
+  max_change_pct: 10,
 };
 
 const READINESS_DEFAULTS: ReadinessConfig = {
@@ -133,6 +139,28 @@ function validateReadiness(raw: unknown): Partial<ReadinessConfig> {
   return out;
 }
 
+function validateFtpSync(raw: unknown): Partial<FtpSyncConfig> {
+  if (raw == null) return {};
+  if (typeof raw !== "object") {
+    throw new Error("ftp_sync must be an object");
+  }
+  const obj = raw as Record<string, unknown>;
+  const out: Partial<FtpSyncConfig> = {};
+  if (obj.enabled !== undefined) {
+    if (typeof obj.enabled !== "boolean") {
+      throw new Error("ftp_sync.enabled must be a boolean");
+    }
+    out.enabled = obj.enabled;
+  }
+  if (obj.max_change_pct !== undefined) {
+    if (typeof obj.max_change_pct !== "number" || obj.max_change_pct <= 0) {
+      throw new Error("ftp_sync.max_change_pct must be a positive number");
+    }
+    out.max_change_pct = obj.max_change_pct;
+  }
+  return out;
+}
+
 function validatePeriodization(raw: unknown): Partial<PeriodizationConfig> {
   if (raw == null) return {};
   if (typeof raw !== "object") {
@@ -216,6 +244,11 @@ export async function loadConfig(filePath: string): Promise<Config> {
     ...READINESS_DEFAULTS,
     ...validateReadiness(doc.readiness),
   };
+
+  const ftp_sync: FtpSyncConfig = {
+    ...FTP_SYNC_DEFAULTS,
+    ...validateFtpSync(doc.ftp_sync),
+  };
   // The artifact ceiling must sit above the alarm threshold, or the filter would
   // drop genuine elevations before they can trip suppression — a self-defeating
   // config that fails silently otherwise.
@@ -234,5 +267,6 @@ export async function loadConfig(filePath: string): Promise<Config> {
     load_targets,
     periodization,
     readiness,
+    ftp_sync,
   };
 }

@@ -71,6 +71,22 @@ sweet_spot:
     expect(config.scheduling.weight_sessions_very_fatigued).toBe(1);
     expect(config.scheduling.min_weight_gap_days).toBe(2);
     expect(config.scheduling.max_weekly_ramp_pct).toBe(7);
+    expect(config.ftp_sync).toEqual({ enabled: true, max_change_pct: 10 });
+  });
+
+  it("accepts ftp_sync overrides and rejects invalid values", async () => {
+    const file = path.join(tmpDir, "config.yaml");
+    await fs.writeFile(
+      file,
+      `${VALID_YAML}\nftp_sync:\n  enabled: false\n  max_change_pct: 5\n`,
+      "utf8",
+    );
+    const config = await loadConfig(file);
+    expect(config.ftp_sync).toEqual({ enabled: false, max_change_pct: 5 });
+
+    const bad = path.join(tmpDir, "bad.yaml");
+    await fs.writeFile(bad, `${VALID_YAML}\nftp_sync:\n  max_change_pct: -3\n`, "utf8");
+    await expect(loadConfig(bad)).rejects.toThrow("ftp_sync.max_change_pct");
   });
 
   it("accepts a max_weekly_ramp_pct override", async () => {

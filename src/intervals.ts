@@ -82,6 +82,14 @@ function normalizeZoneTimes(raw: unknown): {
   return { zoneTimes: sawZone ? zoneTimes : null, ssTime };
 }
 
+// The Ride entry of /athlete/{id}/sport-settings, reduced to the fields the
+// planner uses. `id` is needed to write the entry back (eFTP sync).
+export interface RideSportSettings {
+  id: number;
+  ftp: number | null;
+  lthr: number | null;
+}
+
 export class IntervalsClient {
   private headers: Record<string, string>;
   private fetch: FetchFn;
@@ -134,13 +142,13 @@ export class IntervalsClient {
     return { ctl, atl, tsb };
   }
 
-  // Current cycling FTP from the athlete's Intervals.icu sport settings. The
-  // endpoint returns one settings object per sport group; we read the one whose
-  // `types` includes "Ride". This is the FTP that actually paces the structured
-  // `% FTP` workouts (Intervals.icu resolves them against this value), so it's
-  // the authoritative source for what the athlete will ride. Returns null when
-  // no Ride FTP is set (e.g. a run/swim-only athlete or unconfigured account).
-  async getFtp(): Promise<number | null> {
+  // Cycling sport settings from Intervals.icu. The endpoint returns one
+  // settings object per sport group; we read the one whose `types` includes
+  // "Ride". Its FTP is what actually paces the structured `% FTP` workouts
+  // (Intervals.icu resolves them against this value) and its LTHR anchors the
+  // HR zones, so this is the authoritative source for what the athlete will
+  // ride. Returns null when there is no Ride settings entry at all.
+  async getRideSportSettings(): Promise<RideSportSettings | null> {
     const url = `${BASE_URL}/athlete/${ATHLETE_ID}/sport-settings`;
     const res = await this.fetch(url, { headers: this.headers });
     if (!res.ok) {
@@ -153,9 +161,29 @@ export class IntervalsClient {
       const types = (s as Record<string, unknown>).types;
       return Array.isArray(types) && types.includes("Ride");
     }) as Record<string, unknown> | undefined;
-    // `> 0`: some accounts report an unset FTP as 0, which should read as
-    // "not set", not a literal 0 W (mirrors the v > 0 guard in readiness.ts).
-    return ride && typeof ride.ftp === "number" && ride.ftp > 0 ? ride.ftp : null;
+    if (!ride || typeof ride.id !== "number") return null;
+    // `> 0`: some accounts report an unset FTP/LTHR as 0, which should read as
+    // "not set", not a literal 0 (mirrors the v > 0 guard in readiness.ts).
+    const positive = (v: unknown): number | null => (typeof v === "number" && v > 0 ? v : null);
+    return { id: ride.id, ftp: positive(ride.ftp), lthr: positive(ride.lthr) };
+  }
+
+  async getFtp(): Promise<number | null> {
+    return (await this.getRideSportSettings())?.ftp ?? null;
+  }
+
+  // Partial update of a sport-settings entry (e.g. `{ ftp: 232 }` from the
+  // eFTP sync) — the API merges the given fields, like updateActivity.
+  async updateSportSettings(id: number, fields: Record<string, unknown>): Promise<void> {
+    const url = `${BASE_URL}/athlete/${ATHLETE_ID}/sport-settings/${id}`;
+    const res = await this.fetch(url, {
+      method: "PUT",
+      headers: this.headers,
+      body: JSON.stringify(fields),
+    });
+    if (!res.ok) {
+      throw new Error(`Intervals.icu API error (${res.status}): ${await res.text()}`);
+    }
   }
 
   async getActivities(oldest: string, newest: string): Promise<Activity[]> {
@@ -178,6 +206,8 @@ export class IntervalsClient {
         icu_intensity: normalizeIntensity(a.icu_intensity),
         icu_zone_times: zoneTimes,
         icu_ss_time: ssTime,
+        icu_rolling_ftp:
+          typeof a.icu_rolling_ftp === "number" && a.icu_rolling_ftp > 0 ? a.icu_rolling_ftp : null,
       };
     });
   }

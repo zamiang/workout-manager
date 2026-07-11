@@ -86,12 +86,16 @@ weight_training_taper:
 sweet_spot:
   name: "Sweet Spot Intervals"
   duration_minutes: 60
+  # NOTE: the calendar event never carries this prose — sweet-spot sessions are
+  # always pushed as structured `% FTP` steps (src/workout.ts), which is what
+  # shows targets in Intervals.icu. This text is the coaching rationale kept
+  # with the config; its placeholders render wherever it does surface.
   description: |
     Warm-up (15 min)
     Easy Zone 2 spin at natural cadence (85-95 rpm), with 2-3 short 30s openers
     near threshold in the last 5 min to prime the legs.
 
-    Main Set: 3 x 12 min @ 88-94% FTP (~214-228W at 243 FTP)
+    Main Set: 3 x 12 min @ 88-94% FTP (~{w:88-94}W at {ftp}W FTP)
     Seated, sustained sweet-spot effort at your self-selected cadence (most
     riders settle around 85-95 rpm — let it come naturally, don't force it low).
     This is the highest-yield cycling session for raising lactate threshold and
@@ -103,8 +107,9 @@ sweet_spot:
 
     Progression
     When 3 x 12 min feels sustainable, extend to 3 x 15 min, then 2 x 20 min,
-    then nudge the target toward 95% FTP. Re-test FTP every 6-8 weeks and reset
-    the wattage targets.
+    then nudge the target toward 95% FTP. Wattage targets track your
+    Intervals.icu eFTP automatically (see ftp_sync below) — a formal re-test
+    every couple of months keeps the estimate honest.
 
     Why this replaced low-cadence grinding
     A 12-week RCT in veteran cyclists (mean age 47) found moderate-intensity
@@ -144,12 +149,24 @@ scheduling:
 # to a single long endurance ride (long_minutes) — the century durability anchor.
 # Tune these to your FTP and the volume your week can absorb.
 load_targets:
-  easy_if: 0.62 # easy Zone 2 intensity factor (~151W at 243 FTP)
+  easy_if: 0.62 # easy Zone 2 intensity factor (watts render from live FTP at push time)
   easy_minutes: 75 # standard easy ride duration → ~48 TSS
   long_minutes: 180 # weekly long endurance ride → ~127 TSS (build this up over a block)
   hard_if: 0.88 # hard interval ride IF → ~90 TSS at 75 min
   hard_minutes: 75
   sweet_spot_if: 0.88 # applied to the sweet_spot session (60 min) → ~77 TSS
+
+# eFTP sync: `plan` and `push-week` read Intervals.icu's rolling eFTP estimate
+# (the icu_rolling_ftp stamped on the latest ride) and write it to the Ride
+# sport-settings FTP, so the `% FTP` structured steps and every rendered watt
+# callout track current fitness — no hand-edited FTP after each test. Prose
+# descriptions use placeholders rendered at push time: {ftp}, {lthr},
+# {w:NN[-MM]} (watts at % FTP), {hr:NN[-MM]} (bpm at % LTHR). max_change_pct
+# refuses a single implausible jump (corrupt file, power-meter spike) — apply
+# such a change by setting FTP in Intervals.icu manually if it's real.
+ftp_sync:
+  enabled: true
+  max_change_pct: 10
 
 # Readiness guard: HRV / resting-HR trend from Intervals.icu wellness. A short
 # recent window is compared to a longer rolling baseline; a clear drop downgrades

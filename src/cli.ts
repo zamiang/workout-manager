@@ -8,6 +8,7 @@ import { computeReadiness, type ReadinessSignal } from "./readiness.js";
 import { todayLocal, addLocalDays } from "./dates.js";
 import { computeDistribution, POLARIZED_TARGETS, ZONES, zoneLabel } from "./zones.js";
 import { structuredWorkoutFor } from "./workout.js";
+import { latestEftp, renderTargets, syncFtp } from "./ftp.js";
 import type {
   PlannedWorkout,
   IntervalsEvent,
@@ -264,12 +265,14 @@ async function main() {
       -(config.readiness.baseline_days + config.readiness.recent_days),
     );
 
-    const [info, activities, wellnessRange, ftp] = await Promise.all([
+    const [info, activities, wellnessRange, rideSettings] = await Promise.all([
       xert.getTrainingInfo(),
       intervals.getActivities(lookbackStr, today),
       intervals.getTrainingLoadRange(wellnessStr, today),
-      intervals.getFtp(),
+      intervals.getRideSportSettings(),
     ]);
+    const ftp = rideSettings?.ftp ?? null;
+    const eftp = latestEftp(activities);
     const load = latestTrainingLoad(wellnessRange);
     const distribution = computeDistribution(activities);
     const rampRatePct = computeWeeklyRampPct(wellnessRange.filter((e) => e.date >= weekAgoStr));
@@ -282,6 +285,7 @@ async function main() {
       const out = {
         training_load: load,
         icu_ftp: ftp,
+        icu_eftp: eftp ?? null,
         readiness,
         xert: info,
         zones: { distribution, targets: POLARIZED_TARGETS, deficits },
@@ -302,6 +306,9 @@ async function main() {
     console.log(`Readiness:      ${formatReadiness(readiness)}`);
     console.log();
     console.log(`FTP:    ${ftp !== null ? `${ftp}W` : "not set"}  (Intervals.icu)`);
+    console.log(
+      `eFTP:   ${eftp !== undefined ? `${Math.round(eftp)}W` : "n/a"}  (rolling estimate${config.ftp_sync.enabled ? "; plan auto-applies" : ""})`,
+    );
     console.log(`LTP:    ${info.ltp}W`);
     console.log(`HIE:    ${info.hie} kJ`);
     console.log(`PP:     ${info.pp}W`);
@@ -333,14 +340,22 @@ async function main() {
     -Math.max(1, config.scheduling.min_weight_gap_days - 1),
   );
 
-  const [events, info, activities, wellnessRange, raceEvents] = await Promise.all([
+  const [events, info, activities, wellnessRange, raceEvents, rideSettings] = await Promise.all([
     intervals.getEvents(eventLookbackStr, endStr),
     xert.getTrainingInfo(),
     intervals.getActivities(lookbackStr, today),
     intervals.getTrainingLoadRange(wellnessStr, today),
     intervals.getEvents(today, raceHorizonStr),
+    intervals.getRideSportSettings(),
   ]);
   const load = latestTrainingLoad(wellnessRange);
+
+  // eFTP sync before planning: the applied FTP is what Intervals.icu will
+  // resolve this week's `% FTP` steps against, and what prose watt/HR
+  // placeholders render with. Dry runs preview the update without writing.
+  const renderValues = await syncFtp(intervals, rideSettings, activities, config.ftp_sync, {
+    dryRun,
+  });
 
   const zoneDistribution = computeDistribution(activities);
   // Ramp is a trailing-7-day measure, so slice the wider readiness window back
@@ -371,7 +386,7 @@ async function main() {
     completedDates,
     weeksToRace,
     readiness,
-  });
+  }).map((w) => ({ ...w, description: renderTargets(w.description, renderValues) }));
 
   // Match the scheduler: suppressed readiness downgrades the displayed tier too,
   // so the status line never contradicts the plan it printed.

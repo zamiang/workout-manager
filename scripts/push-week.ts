@@ -16,10 +16,11 @@ import { config as loadEnv } from "dotenv";
 loadEnv({ quiet: true });
 import { promises as fs } from "node:fs";
 import { parse } from "yaml";
-import { toLocalISODate } from "../src/dates.js";
+import { toLocalISODate, todayLocal, addLocalDays } from "../src/dates.js";
 import { loadConfig } from "../src/config.js";
 import { IntervalsClient } from "../src/intervals.js";
 import { sweetSpotWorkout } from "../src/workout.js";
+import { renderTargets, syncFtp } from "../src/ftp.js";
 import type { Config, IntervalsEvent } from "../src/types.js";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -195,7 +196,21 @@ async function main() {
   const anchorStr = dateStr(anchor, 0);
 
   const client = new IntervalsClient(process.env.INTERVALS_API_KEY!);
-  const existing = await client.getEvents(oldest, newest);
+  const today = todayLocal();
+  const [existing, rideSettings, activities] = await Promise.all([
+    client.getEvents(oldest, newest),
+    client.getRideSportSettings(),
+    // 30 days is plenty to find the latest ride carrying an eFTP estimate.
+    client.getActivities(addLocalDays(today, -30), today),
+  ]);
+
+  // eFTP sync + placeholder rendering: descriptions in the plan file carry
+  // {ftp}/{lthr}/{w:..}/{hr:..} placeholders instead of hardcoded watts; they
+  // render from the (freshly synced) Intervals.icu sport settings.
+  const renderValues = await syncFtp(client, rideSettings, activities, config.ftp_sync, { dryRun });
+  for (const e of events) {
+    if (e.description) e.description = renderTargets(e.description, renderValues);
+  }
 
   const actions = planPushActions(events, existing, replace);
 
