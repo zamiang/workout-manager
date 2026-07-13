@@ -121,8 +121,6 @@ export interface XertTrainingInfo {
   pp: number; // peak power
   training_status: string;
   focus: string; // recommended focus type
-  wotd_name?: string;
-  wotd_description?: string;
 }
 
 // --- Scheduler ---

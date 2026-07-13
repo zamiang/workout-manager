@@ -59,16 +59,14 @@ export class XertClient {
     }
 
     // Coerce defensively — an OAuth endpoint can return a 200 with an error or
-    // partial body, and these values feed straight into display (and the WOTD
-    // name/description into hard-ride descriptions). Mirrors the parseEvent /
-    // parseWellnessEntry style on the Intervals.icu side.
+    // partial body, and these values feed straight into display. Mirrors the
+    // parseEvent / parseWellnessEntry style on the Intervals.icu side.
     const obj = (v: unknown): Record<string, unknown> =>
       v && typeof v === "object" ? (v as Record<string, unknown>) : {};
     const num = (v: unknown): number => (typeof v === "number" ? v : 0);
     const str = (v: unknown): string => (typeof v === "string" ? v : "");
     const data = obj(await res.json());
     const sig = obj(data.signature);
-    const wotd = obj(data.wotd);
     return {
       ftp: num(sig.ftp),
       ltp: num(sig.ltp),
@@ -76,8 +74,6 @@ export class XertClient {
       pp: num(sig.pp),
       training_status: str(data.status),
       focus: str(data.focus),
-      wotd_name: typeof wotd.name === "string" ? wotd.name : undefined,
-      wotd_description: typeof wotd.description === "string" ? wotd.description : undefined,
     };
   }
 }

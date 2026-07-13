@@ -18,10 +18,6 @@ const MOCK_TRAINING_INFO = {
     pp: 1100,
   },
   focus: "Endurance",
-  wotd: {
-    name: "Easy Endurance Ride",
-    description: "60 min zone 2",
-  },
 };
 
 describe("XertClient", () => {
@@ -105,7 +101,7 @@ describe("XertClient", () => {
 
     it("coerces a malformed 200 body to safe defaults instead of NaN/undefined", async () => {
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => MOCK_TOKEN_RESPONSE });
-      // 200 with an error-shaped body: no signature, no status/focus, no wotd.
+      // 200 with an error-shaped body: no signature, no status/focus.
       mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ error: "no data" }) });
 
       await client.authenticate();
@@ -117,8 +113,6 @@ describe("XertClient", () => {
       expect(info.pp).toBe(0);
       expect(info.training_status).toBe("");
       expect(info.focus).toBe("");
-      expect(info.wotd_name).toBeUndefined();
-      expect(info.wotd_description).toBeUndefined();
     });
   });
 });
