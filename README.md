@@ -192,9 +192,10 @@ shows them in the calendar and the Companion app:
   named for its zone (e.g. "VO2 Max Intervals").
 
 - **Easy and long endurance rides** are written with both a power target and an
-  HR-zone target (`62% Z2 HR`): the **HR zone** shows the target bpm band from
-  your stored HR zones, while the **power target** (set to the planned IF) is
-  what Intervals.icu uses to compute planned load. An HR-only step leaves
+  HR-zone target (`56-68% Z2 HR`): the **HR zone** shows the target bpm band
+  from your stored HR zones, while the **power target** (a ±6% band centered on
+  the planned IF, so it's actually holdable outdoors) is what Intervals.icu
+  uses to compute planned load, from the band midpoint. An HR-only step leaves
   `normalized_power` at 0, so Intervals.icu can't forecast TSS/CTL and falls
   back to a broken ~33% estimate — the explicit power target avoids that.
 

@@ -8,20 +8,25 @@ import {
 import type { PlannedWorkout } from "../src/types.js";
 
 describe("easyEnduranceWorkout", () => {
-  it("writes the power target ahead of the HR zone, in the order the parser expects", () => {
+  it("writes the power band ahead of the HR zone, in the order the parser expects", () => {
     const w = easyEnduranceWorkout(75, 62);
     // An HR-only step leaves normalized_power at 0 (broken planned load); the
     // power target fixes it, and `% Z2 HR` is the order Intervals.icu parses.
-    expect(w.text).toContain("62% Z2 HR");
+    // The target is a ±6% band centered on the planned IF: an exact percent is
+    // unrideable outdoors and gets ignored, which showed up as easy rides
+    // consistently ridden ~10% over target.
+    expect(w.text).toContain("56-68% Z2 HR");
     expect(w.text.trim().startsWith("- 75m")).toBe(true);
     expect(w.minutes).toBe(75);
   });
 
-  it("reports an intensityFactor matching the whole-percent power target", () => {
-    // The step text rounds to a whole percent; intensityFactor must mirror that
-    // rounding so a caller's submitted TSS matches the step Intervals.icu reads.
+  it("reports an intensityFactor matching the band midpoint", () => {
+    // Intervals.icu derives planned load from the band midpoint (the whole
+    // percent the band is built around); intensityFactor must mirror it so a
+    // caller's submitted TSS matches the step Intervals.icu reads.
     expect(easyEnduranceWorkout(180, 62).intensityFactor).toBe(0.62);
     expect(easyEnduranceWorkout(75, 63).intensityFactor).toBe(0.63);
+    expect(easyEnduranceWorkout(75, 63).text).toContain("57-69% Z2 HR");
   });
 });
 
@@ -94,7 +99,7 @@ describe("structuredWorkoutFor", () => {
     const s = structuredWorkoutFor(
       planned({ intensity: "easy", durationMin: 90, intensityFactor: 0.62 }),
     );
-    expect(s?.text).toContain("62% Z2 HR"); // power target (load) + HR-zone target (display)
+    expect(s?.text).toContain("56-68% Z2 HR"); // power band (load from midpoint) + HR-zone target (display)
     expect(s?.minutes).toBe(90);
   });
 
