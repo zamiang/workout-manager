@@ -27,15 +27,26 @@ export interface StructuredWorkout {
 }
 
 // A steady Zone 2 endurance ride carrying BOTH a power target and an HR-zone
-// target. The power target (`{ftpPct}%`) is what Intervals.icu uses to compute
-// planned load/CTL — an HR-only step leaves normalized_power at 0, so it can't
+// target. The power target is what Intervals.icu uses to compute planned
+// load/CTL — an HR-only step leaves normalized_power at 0, so it can't
 // forecast TSS and falls back to a broken ~33% estimate. `Z2 HR` then pins the
-// heart-rate target so the athlete still sees the stored-zone bpm band. The
-// power target is the planned IF rounded to a whole percent; the returned
-// intensityFactor mirrors that rounding so the submitted TSS matches the step.
+// heart-rate target so the athlete still sees the stored-zone bpm band.
+//
+// The power target is written as a band around the planned IF, not an exact
+// percent: downstream integrations (Garmin, Zwift) render the step's target
+// literally, and an exact watt target is unrideable outdoors — in practice it
+// gets ignored wholesale and easy rides drift ~10% hot. The band gives the
+// rider something they can actually hold on open roads while still bounding
+// the effort. Intervals.icu derives planned load from the band midpoint, which
+// is the planned IF, so the returned intensityFactor (and the TSS callers
+// compute from it) still matches what Intervals.icu re-derives from the step.
+const EASY_BAND_HALF_WIDTH_PCT = 6;
+
 export function easyEnduranceWorkout(minutes: number, ftpPct: number): StructuredWorkout {
+  const lo = ftpPct - EASY_BAND_HALF_WIDTH_PCT;
+  const hi = ftpPct + EASY_BAND_HALF_WIDTH_PCT;
   return {
-    text: `- ${minutes}m ${ftpPct}% Z2 HR Steady Zone 2 endurance`,
+    text: `- ${minutes}m ${lo}-${hi}% Z2 HR Steady Zone 2 endurance`,
     minutes,
     intensityFactor: ftpPct / 100,
   };
