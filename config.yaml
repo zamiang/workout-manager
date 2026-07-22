@@ -3,9 +3,10 @@ weight_training:
   duration_minutes: 60
   description: |
     Warm-Up (8 min)
-    Deadbugs (2x10), hip circles, band pull-aparts, bodyweight squats — get the
-    core switched on and the hips/shoulders mobile. Then 2 light ramp-up sets on
-    your first heavy lift before working weight.
+    Deadbugs (1x15), scissor kicks (1x15), hip circles, band pull-aparts,
+    bodyweight squats — core switched on, hip flexors primed for the climbing
+    upstroke, hips/shoulders mobile. Then 2 light ramp-up sets on your first
+    heavy lift before working weight.
 
     Block 1: Heavy Strength (30 min) — the part that actually moves your power.
     Lift heavy, low reps, and rest 2-3 min between sets. These are loadable on
@@ -18,7 +19,9 @@ weight_training:
        progression is visible.
     2. Trap-Bar Deadlift (or Romanian Deadlift) — 3x5-6 @ heavy
        Your loaded hip hinge. Pull every rep to a hard glute squeeze at
-       lockout. Hinge from the hips, neutral spine. Log the load.
+       lockout. Hinge from the hips, neutral spine. Log the TOTAL weight
+       (bar + plates, not plates only) — this lift should end up the heaviest
+       of the day, comfortably above the squat.
     3. Bulgarian Split Squat (Dumbbells) — 3x6-8 each leg @ heavy
        Single-leg strength and hip stability. Hold DBs and load it — work toward
        30-40lb. Control the descent, drive through the front heel.
@@ -41,6 +44,8 @@ weight_training:
        Anti-extension. If too difficult, do them from knees with limited range.
     9. Side Plank — 3x30-45 sec each side
        Anti-lateral flexion. Keeps your hips from dropping while pedaling.
+       Log the actual seconds (prefill the duration in the Hevy routine so
+       checked-off sets don't record as 0s).
     10. Pallof Press (Band) — 2x10 each side
         Anti-rotation. Anchor the band at chest height, press out and hold.
 
